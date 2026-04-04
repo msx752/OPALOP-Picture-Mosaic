@@ -2,9 +2,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Opalop.Application\Opalop.Application.csproj" />
     <ProjectReference Include="..\Opalop.Infrastructure\Opalop.Infrastructure.csproj" />
+    <ProjectReference Include="..\Opalop.Mosaic.Engine\Opalop.Mosaic.Engine.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 </Project>

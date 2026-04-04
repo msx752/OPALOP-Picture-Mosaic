@@ -1,3 +1,6 @@
+using Opalop.Api.Endpoints;
+using Opalop.Api.Hubs;
+using Opalop.Api.Services;
 using Opalop.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +15,9 @@ builder.Services.AddAuthentication("Bearer")
         options.RequireHttpsMetadata = false;
     });
 builder.Services.AddAuthorization();
+
+builder.Services.AddScoped<MosaicOrchestrator>();
+builder.Services.AddSignalR();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -28,6 +34,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+
+app.MapPhotoEndpoints();
+app.MapResourceEndpoints();
+app.MapMosaicEndpoints();
+app.MapAccountEndpoints();
+app.MapHub<MosaicProgressHub>("/hubs/mosaic");
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
