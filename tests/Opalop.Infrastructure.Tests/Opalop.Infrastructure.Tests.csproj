@@ -8,6 +8,7 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.Redis" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
   </ItemGroup>
 </Project>
