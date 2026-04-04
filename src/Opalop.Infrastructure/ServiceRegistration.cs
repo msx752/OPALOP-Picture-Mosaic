@@ -3,6 +3,7 @@ namespace Opalop.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Opalop.Application.Interfaces;
 using Opalop.Infrastructure.Persistence;
 using Opalop.Infrastructure.Redis;
 
@@ -21,6 +22,9 @@ public static class ServiceRegistration
 
         var redisConnection = configuration.GetConnectionString("Redis")!;
         services.AddSingleton(new RedisConnectionManager(redisConnection));
+        services.AddSingleton<IColorIndex, RedisColorIndex>();
+        services.AddSingleton<IMosaicQueue, RedisMosaicQueue>();
+        services.AddSingleton<IJobTracker, RedisJobTracker>();
 
         return services;
     }
