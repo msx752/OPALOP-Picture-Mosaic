@@ -2,4 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Opalop.Domain\Opalop.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
 </Project>
