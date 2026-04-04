@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  opalop-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+
+  opalop-worker:
+    environment:
+      - DOTNET_ENVIRONMENT=Development

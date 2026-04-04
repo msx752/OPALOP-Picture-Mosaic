@@ -1,0 +1,123 @@
+version: "3.9"
+
+services:
+  opalop-api:
+    build:
+      context: .
+      dockerfile: src/Opalop.Api/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ConnectionStrings__PostgreSQL=Host=postgresql;Database=opalop;Username=opalop;Password=dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - MinIO__UseSSL=false
+      - Keycloak__Authority=http://keycloak:8080/realms/opalop
+      - Keycloak__Audience=opalop-api
+    depends_on:
+      redis:
+        condition: service_started
+      postgresql:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      keycloak:
+        condition: service_started
+
+  opalop-worker:
+    build:
+      context: .
+      dockerfile: src/Opalop.Worker/Dockerfile
+    environment:
+      - ConnectionStrings__PostgreSQL=Host=postgresql;Database=opalop;Username=opalop;Password=dev_password
+      - ConnectionStrings__Redis=redis:6379
+      - MinIO__Endpoint=minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - MinIO__UseSSL=false
+      - Worker__ConsumerGroup=workers
+      - Worker__StreamKey=mosaic:tiles
+      - Worker__ClaimTimeout=30000
+    depends_on:
+      redis:
+        condition: service_started
+      postgresql:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    deploy:
+      replicas: 2
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+
+  postgresql:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=opalop
+      - POSTGRES_USER=opalop
+      - POSTGRES_PASSWORD=dev_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opalop -d opalop"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/photos;
+      mc mb --ignore-existing local/resources;
+      mc mb --ignore-existing local/mosaics;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    ports:
+      - "8080:8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HEALTH_ENABLED=true
+    command: start-dev --import-realm
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import
+
+volumes:
+  redis-data:
+  pgdata:
+  minio-data:
