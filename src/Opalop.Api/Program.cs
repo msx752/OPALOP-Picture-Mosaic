@@ -1,3 +1,4 @@
+using Opalop.Api.Components;
 using Opalop.Api.Endpoints;
 using Opalop.Api.Hubs;
 using Opalop.Api.Services;
@@ -24,6 +25,8 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddRazorComponents();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -45,5 +48,7 @@ app.MapAdminEndpoints();
 app.MapHub<MosaicProgressHub>("/hubs/mosaic");
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+
+app.MapRazorComponents<App>();
 
 app.Run();

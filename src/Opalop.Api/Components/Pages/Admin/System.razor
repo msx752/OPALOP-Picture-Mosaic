@@ -1,0 +1,211 @@
+@page "/admin/system"
+@using Microsoft.EntityFrameworkCore
+@using Minio
+@using Opalop.Infrastructure.Persistence
+@using Opalop.Infrastructure.Redis
+@inject OpalopDbContext Db
+@inject RedisConnectionManager Redis
+@inject IMinioClient Minio
+
+<h1 style="font-size:24px; margin-bottom:24px;">System Health</h1>
+
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px;">
+    @* PostgreSQL *@
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="font-size:16px;">PostgreSQL</h3>
+            <span style="width:10px; height:10px; border-radius:50%; background:@(_pgHealthy ? "#6ee7b7" : "#fca5a5"); display:inline-block;"></span>
+        </div>
+        <div style="font-size:14px; color:var(--muted);">
+            <div style="margin-bottom:8px;">
+                <span>Status:</span>
+                <span style="color:@(_pgHealthy ? "#6ee7b7" : "#fca5a5"); font-weight:bold; margin-left:8px;">
+                    @(_pgHealthy ? "Connected" : "Disconnected")
+                </span>
+            </div>
+            @if (_pgError is not null)
+            {
+                <div style="color:#fca5a5; font-size:12px; word-break:break-all;">@_pgError</div>
+            }
+            else
+            {
+                <div>Users: <strong style="color:var(--text);">@_pgUserCount</strong></div>
+                <div>Photos: <strong style="color:var(--text);">@_pgPhotoCount</strong></div>
+                <div>Jobs: <strong style="color:var(--text);">@_pgJobCount</strong></div>
+            }
+        </div>
+    </div>
+
+    @* Redis *@
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="font-size:16px;">Redis</h3>
+            <span style="width:10px; height:10px; border-radius:50%; background:@(_redisHealthy ? "#6ee7b7" : "#fca5a5"); display:inline-block;"></span>
+        </div>
+        <div style="font-size:14px; color:var(--muted);">
+            <div style="margin-bottom:8px;">
+                <span>Status:</span>
+                <span style="color:@(_redisHealthy ? "#6ee7b7" : "#fca5a5"); font-weight:bold; margin-left:8px;">
+                    @(_redisHealthy ? "Connected" : "Disconnected")
+                </span>
+            </div>
+            @if (_redisError is not null)
+            {
+                <div style="color:#fca5a5; font-size:12px; word-break:break-all;">@_redisError</div>
+            }
+            else
+            {
+                <div>Ping: <strong style="color:var(--text);">@($"{_redisPingMs:F1}")ms</strong></div>
+                <div>Memory: <strong style="color:var(--text);">@_redisMemory</strong></div>
+                <div>Keys: <strong style="color:var(--text);">@_redisKeyCount</strong></div>
+                <div>Version: <strong style="color:var(--text);">@_redisVersion</strong></div>
+            }
+        </div>
+    </div>
+
+    @* MinIO *@
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="font-size:16px;">MinIO</h3>
+            <span style="width:10px; height:10px; border-radius:50%; background:@(_minioHealthy ? "#6ee7b7" : "#fca5a5"); display:inline-block;"></span>
+        </div>
+        <div style="font-size:14px; color:var(--muted);">
+            <div style="margin-bottom:8px;">
+                <span>Status:</span>
+                <span style="color:@(_minioHealthy ? "#6ee7b7" : "#fca5a5"); font-weight:bold; margin-left:8px;">
+                    @(_minioHealthy ? "Connected" : "Disconnected")
+                </span>
+            </div>
+            @if (_minioError is not null)
+            {
+                <div style="color:#fca5a5; font-size:12px; word-break:break-all;">@_minioError</div>
+            }
+            else
+            {
+                <div>Buckets: <strong style="color:var(--text);">@_minioBucketCount</strong></div>
+                @foreach (var bucket in _minioBuckets)
+                {
+                    <div style="font-size:12px; margin-left:8px;">- @bucket</div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<h2 style="font-size:18px; margin-bottom:16px;">Environment</h2>
+<div class="card">
+    <table>
+        <tbody>
+            <tr><td style="color:var(--muted); width:200px;">Runtime</td><td>@_runtimeFramework</td></tr>
+            <tr><td style="color:var(--muted);">OS</td><td>@_osDescription</td></tr>
+            <tr><td style="color:var(--muted);">Process Architecture</td><td>@_processArch</td></tr>
+            <tr><td style="color:var(--muted);">Server Time (UTC)</td><td>@DateTime.UtcNow.ToString("F")</td></tr>
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private static readonly string _runtimeFramework = global::System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+    private static readonly string _osDescription = global::System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+    private static readonly string _processArch = global::System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString();
+
+    private bool _pgHealthy, _redisHealthy, _minioHealthy;
+    private string? _pgError, _redisError, _minioError;
+    private int _pgUserCount, _pgPhotoCount, _pgJobCount;
+    private double _redisPingMs;
+    private string _redisMemory = "-", _redisVersion = "-";
+    private long _redisKeyCount;
+    private int _minioBucketCount;
+    private List<string> _minioBuckets = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckPostgres();
+        await CheckRedis();
+        await CheckMinio();
+    }
+
+    private async Task CheckPostgres()
+    {
+        try
+        {
+            _pgHealthy = await Db.Database.CanConnectAsync();
+            if (_pgHealthy)
+            {
+                _pgUserCount = await Db.Users.CountAsync();
+                _pgPhotoCount = await Db.Photos.CountAsync();
+                _pgJobCount = await Db.MosaicJobs.CountAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _pgError = ex.Message;
+        }
+    }
+
+    private async Task CheckRedis()
+    {
+        try
+        {
+            var db = Redis.GetDatabase();
+            var pong = await db.PingAsync();
+            _redisPingMs = pong.TotalMilliseconds;
+            _redisHealthy = pong.TotalMilliseconds < 5000;
+
+            var server = Redis.GetServer();
+            var info = await server.InfoAsync();
+
+            foreach (var section in info)
+            {
+                if (string.Equals(section.Key, "Memory", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var entry in section)
+                    {
+                        if (entry.Key == "used_memory_human")
+                            _redisMemory = entry.Value;
+                    }
+                }
+                if (string.Equals(section.Key, "Server", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var entry in section)
+                    {
+                        if (entry.Key == "redis_version")
+                            _redisVersion = entry.Value;
+                    }
+                }
+                if (string.Equals(section.Key, "Keyspace", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var entry in section)
+                    {
+                        // Format: "db0:keys=123,expires=0,avg_ttl=0"
+                        var parts = entry.Value.Split(',');
+                        foreach (var part in parts)
+                        {
+                            if (part.StartsWith("keys=") && long.TryParse(part[5..], out var keys))
+                                _redisKeyCount += keys;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _redisError = ex.Message;
+        }
+    }
+
+    private async Task CheckMinio()
+    {
+        try
+        {
+            var buckets = await Minio.ListBucketsAsync();
+            _minioHealthy = true;
+            _minioBucketCount = buckets.Buckets.Count;
+            _minioBuckets = buckets.Buckets.Select(b => b.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            _minioError = ex.Message;
+        }
+    }
+}

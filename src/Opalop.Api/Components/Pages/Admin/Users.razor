@@ -1,0 +1,160 @@
+@page "/admin/users"
+@using Microsoft.EntityFrameworkCore
+@using Opalop.Infrastructure.Persistence
+@inject OpalopDbContext Db
+@inject NavigationManager Nav
+
+<h1 style="font-size:24px; margin-bottom:24px;">Users</h1>
+
+<div class="card" style="margin-bottom:20px;">
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Display Name</th>
+                <th>Tickets</th>
+                <th>Photos</th>
+                <th>Jobs</th>
+                <th>Active</th>
+                <th>Last Login</th>
+                <th>Created</th>
+                <th>Quota</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var user in _users)
+            {
+                <tr>
+                    <td>@user.Email</td>
+                    <td>@(user.DisplayName ?? "-")</td>
+                    <td style="font-weight:bold;">@user.TicketBalance</td>
+                    <td>@user.PhotoCount</td>
+                    <td>@user.JobCount</td>
+                    <td>
+                        @if (user.IsActive)
+                        {
+                            <span style="color:var(--success);">Yes</span>
+                        }
+                        else
+                        {
+                            <span style="color:#fca5a5;">No</span>
+                        }
+                    </td>
+                    <td>@(user.LastLoginAt?.ToString("g") ?? "Never")</td>
+                    <td>@user.CreatedAt.ToString("g")</td>
+                    <td>
+                        @if (_editingUserId == user.Id)
+                        {
+                            <form method="post" @formname="@($"quota-{user.Id}")" @onsubmit="SaveQuota"
+                                  style="display:flex; gap:4px; align-items:center;">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="UserId" value="@user.Id" />
+                                <input type="number" name="Tickets" value="@user.TicketBalance"
+                                       style="width:70px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:4px 8px; font-size:13px;" />
+                                <button type="submit"
+                                        style="background:var(--accent); color:#0f172a; border:none; padding:4px 10px; border-radius:4px; font-size:12px; cursor:pointer;">
+                                    Save
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <a href="/admin/users?edit=@user.Id&page=@_page"
+                               style="font-size:12px; padding:4px 10px; background:var(--surface); border:1px solid var(--border); border-radius:4px;">
+                                Edit
+                            </a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div style="display:flex; gap:12px; align-items:center;">
+    @if (_page > 1)
+    {
+        <a href="/admin/users?page=@(_page - 1)" style="background:var(--surface); padding:6px 16px; border-radius:6px; font-size:14px;">Previous</a>
+    }
+    <span style="color:var(--muted); font-size:14px;">Page @_page of @_totalPages (@_totalCount users)</span>
+    @if (_page < _totalPages)
+    {
+        <a href="/admin/users?page=@(_page + 1)" style="background:var(--surface); padding:6px 16px; border-radius:6px; font-size:14px;">Next</a>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div style="margin-top:16px; padding:10px 16px; background:#064e3b; border-radius:6px; color:#6ee7b7; font-size:14px;">
+        @_message
+    </div>
+}
+
+@code {
+    private const int PageSize = 20;
+    private List<UserRow> _users = [];
+    private int _totalCount, _totalPages, _page = 1;
+    private Guid? _editingUserId;
+    private string? _message = null;
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? PageParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "edit")]
+    public Guid? EditParam { get; set; }
+
+    [SupplyParameterFromForm(Name = "UserId")]
+    public Guid? FormUserId { get; set; }
+
+    [SupplyParameterFromForm(Name = "Tickets")]
+    public int? FormTickets { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _page = PageParam is > 0 ? PageParam.Value : 1;
+        _editingUserId = EditParam;
+
+        _totalCount = await Db.Users.CountAsync();
+        _totalPages = Math.Max(1, (int)Math.Ceiling(_totalCount / (double)PageSize));
+
+        _users = await Db.Users
+            .OrderByDescending(u => u.CreatedAt)
+            .Skip((_page - 1) * PageSize)
+            .Take(PageSize)
+            .Select(u => new UserRow(
+                u.Id, u.Email, u.DisplayName, u.TicketBalance,
+                u.IsActive, u.CreatedAt, u.LastLoginAt,
+                u.Photos.Count, u.MosaicJobs.Count))
+            .ToListAsync();
+    }
+
+    private async Task SaveQuota()
+    {
+        if (FormUserId.HasValue && FormTickets.HasValue)
+        {
+            var user = await Db.Users.FirstOrDefaultAsync(u => u.Id == FormUserId.Value);
+            if (user is not null)
+            {
+                user.TicketBalance = FormTickets.Value;
+                await Db.SaveChangesAsync();
+                _message = $"Updated ticket balance for {user.Email} to {FormTickets.Value}.";
+
+                // Refresh the user list
+                _users = await Db.Users
+                    .OrderByDescending(u => u.CreatedAt)
+                    .Skip((_page - 1) * PageSize)
+                    .Take(PageSize)
+                    .Select(u => new UserRow(
+                        u.Id, u.Email, u.DisplayName, u.TicketBalance,
+                        u.IsActive, u.CreatedAt, u.LastLoginAt,
+                        u.Photos.Count, u.MosaicJobs.Count))
+                    .ToListAsync();
+            }
+        }
+    }
+
+    private record UserRow(
+        Guid Id, string Email, string? DisplayName, int TicketBalance,
+        bool IsActive, DateTime CreatedAt, DateTime? LastLoginAt,
+        int PhotoCount, int JobCount);
+}

@@ -1,0 +1,19 @@
+@inherits LayoutComponentBase
+
+<div style="display:flex; min-height:100vh;">
+    <nav style="width:220px; background:var(--surface); padding:20px; border-right:1px solid var(--border);">
+        <h2 style="color:var(--accent); margin-bottom:24px; font-size:18px;">OPALOP Admin</h2>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <a href="/admin" style="display:block; padding:8px 12px; border-radius:6px; color:var(--muted);">Dashboard</a>
+            <a href="/admin/jobs" style="display:block; padding:8px 12px; border-radius:6px; color:var(--muted);">Jobs</a>
+            <a href="/admin/users" style="display:block; padding:8px 12px; border-radius:6px; color:var(--muted);">Users</a>
+            <a href="/admin/system" style="display:block; padding:8px 12px; border-radius:6px; color:var(--muted);">System</a>
+        </div>
+        <div style="margin-top:auto; padding-top:24px; border-top:1px solid var(--border); margin-top:24px;">
+            <a href="/" style="color:var(--muted); font-size:13px;">&larr; Back to API</a>
+        </div>
+    </nav>
+    <main style="flex:1; padding:24px; max-width:1200px;">
+        @Body
+    </main>
+</div>

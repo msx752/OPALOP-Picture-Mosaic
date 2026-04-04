@@ -1,0 +1,122 @@
+@page "/admin/jobs"
+@using Microsoft.EntityFrameworkCore
+@using Opalop.Domain.Enums
+@using Opalop.Infrastructure.Persistence
+@inject OpalopDbContext Db
+@inject NavigationManager Nav
+
+<h1 style="font-size:24px; margin-bottom:24px;">Jobs</h1>
+
+<div style="display:flex; gap:12px; margin-bottom:20px; align-items:center;">
+    <label style="color:var(--muted); font-size:14px;">Status Filter:</label>
+    <select @bind="_statusFilter"
+            style="background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:14px;">
+        <option value="">All</option>
+        @foreach (var s in Enum.GetValues<JobStatus>())
+        {
+            <option value="@s">@s</option>
+        }
+    </select>
+    <a href="@BuildUrl()" style="background:var(--accent); color:#0f172a; padding:6px 16px; border-radius:6px; font-size:14px; font-weight:500;">Apply</a>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Status</th>
+                <th>Format</th>
+                <th>Tiles</th>
+                <th>Duration</th>
+                <th>Error</th>
+                <th>Created</th>
+                <th>Completed</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var job in _jobs)
+            {
+                <tr>
+                    <td style="font-family:monospace; font-size:12px;">@job.Id.ToString()[..8]...</td>
+                    <td>@job.UserEmail</td>
+                    <td><span class="badge badge-@job.Status.ToString().ToLower()">@job.Status</span></td>
+                    <td>@job.PxSize</td>
+                    <td>@job.CompletedTiles / @job.TotalTiles</td>
+                    <td>@(job.DurationMs.HasValue ? $"{job.DurationMs}ms" : "-")</td>
+                    <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:12px;"
+                        title="@job.ErrorMessage">@(job.ErrorMessage ?? "-")</td>
+                    <td>@job.CreatedAt.ToString("g")</td>
+                    <td>@(job.CompletedAt?.ToString("g") ?? "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div style="display:flex; gap:12px; align-items:center;">
+    @if (_page > 1)
+    {
+        <a href="@BuildUrl(_page - 1)" style="background:var(--surface); padding:6px 16px; border-radius:6px; font-size:14px;">Previous</a>
+    }
+    <span style="color:var(--muted); font-size:14px;">Page @_page of @_totalPages (@_totalCount jobs)</span>
+    @if (_page < _totalPages)
+    {
+        <a href="@BuildUrl(_page + 1)" style="background:var(--surface); padding:6px 16px; border-radius:6px; font-size:14px;">Next</a>
+    }
+</div>
+
+@code {
+    private const int PageSize = 20;
+    private List<JobRow> _jobs = [];
+    private int _totalCount, _totalPages, _page = 1;
+    private string _statusFilter = "";
+
+    [SupplyParameterFromQuery(Name = "status")]
+    public string? StatusParam { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int? PageParam { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _page = PageParam is > 0 ? PageParam.Value : 1;
+        _statusFilter = StatusParam ?? "";
+
+        var query = Db.MosaicJobs.AsQueryable();
+
+        if (!string.IsNullOrEmpty(_statusFilter) && Enum.TryParse<JobStatus>(_statusFilter, ignoreCase: true, out var parsed))
+        {
+            query = query.Where(j => j.Status == parsed);
+        }
+
+        _totalCount = await query.CountAsync();
+        _totalPages = Math.Max(1, (int)Math.Ceiling(_totalCount / (double)PageSize));
+
+        _jobs = await query
+            .Include(j => j.User)
+            .OrderByDescending(j => j.CreatedAt)
+            .Skip((_page - 1) * PageSize)
+            .Take(PageSize)
+            .Select(j => new JobRow(
+                j.Id, j.User.Email, j.Status, j.PxFormat.Size,
+                j.TotalTiles, j.CompletedTiles, j.ErrorMessage,
+                j.DurationMs, j.CreatedAt, j.CompletedAt))
+            .ToListAsync();
+    }
+
+    private string BuildUrl(int? page = null)
+    {
+        var p = page ?? _page;
+        var filter = _statusFilter;
+        var qs = $"/admin/jobs?page={p}";
+        if (!string.IsNullOrEmpty(filter)) qs += $"&status={filter}";
+        return qs;
+    }
+
+    private record JobRow(
+        Guid Id, string UserEmail, JobStatus Status, int PxSize,
+        int TotalTiles, int CompletedTiles, string? ErrorMessage,
+        long? DurationMs, DateTime CreatedAt, DateTime? CompletedAt);
+}

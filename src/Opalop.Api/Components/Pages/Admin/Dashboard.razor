@@ -1,0 +1,68 @@
+@page "/admin"
+@using Microsoft.EntityFrameworkCore
+@using Opalop.Domain.Enums
+@using Opalop.Infrastructure.Persistence
+@inject OpalopDbContext Db
+
+<h1 style="font-size:24px; margin-bottom:24px;">Dashboard</h1>
+
+<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px;">
+    <div class="card stat" style="background:#064e3b;">
+        <div class="stat-value" style="color:#6ee7b7;">@_totalMosaics</div>
+        <div class="stat-label">Completed Mosaics</div>
+    </div>
+    <div class="card stat" style="background:#1c1917;">
+        <div class="stat-value" style="color:#fcd34d;">@_activeJobs</div>
+        <div class="stat-label">Active Jobs</div>
+    </div>
+    <div class="card stat" style="background:#312e81;">
+        <div class="stat-value" style="color:#a5b4fc;">@_totalUsers</div>
+        <div class="stat-label">Users</div>
+    </div>
+    <div class="card stat" style="background:#14532d;">
+        <div class="stat-value" style="color:#86efac;">@_totalPhotos</div>
+        <div class="stat-label">Photos</div>
+    </div>
+</div>
+
+<h2 style="font-size:18px; margin-bottom:16px;">Recent Jobs</h2>
+<div class="card">
+    <table>
+        <thead><tr><th>ID</th><th>User</th><th>Status</th><th>Tiles</th><th>Duration</th><th>Created</th></tr></thead>
+        <tbody>
+            @foreach (var job in _recentJobs)
+            {
+                <tr>
+                    <td style="font-family:monospace; font-size:12px;">@job.Id.ToString()[..8]...</td>
+                    <td>@job.UserEmail</td>
+                    <td><span class="badge badge-@job.Status.ToString().ToLower()">@job.Status</span></td>
+                    <td>@job.CompletedTiles / @job.TotalTiles</td>
+                    <td>@(job.DurationMs.HasValue ? $"{job.DurationMs}ms" : "-")</td>
+                    <td>@job.CreatedAt.ToString("g")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private int _totalMosaics, _activeJobs, _totalUsers, _totalPhotos;
+    private List<JobRow> _recentJobs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _totalMosaics = await Db.MosaicJobs.CountAsync(j => j.Status == JobStatus.Completed);
+        _activeJobs = await Db.MosaicJobs.CountAsync(j => j.Status == JobStatus.Processing);
+        _totalUsers = await Db.Users.CountAsync(u => u.IsActive);
+        _totalPhotos = await Db.Photos.CountAsync(p => p.IsActive);
+
+        _recentJobs = await Db.MosaicJobs
+            .Include(j => j.User)
+            .OrderByDescending(j => j.CreatedAt)
+            .Take(10)
+            .Select(j => new JobRow(j.Id, j.User.Email, j.Status, j.TotalTiles, j.CompletedTiles, j.DurationMs, j.CreatedAt))
+            .ToListAsync();
+    }
+
+    private record JobRow(Guid Id, string UserEmail, JobStatus Status, int TotalTiles, int CompletedTiles, long? DurationMs, DateTime CreatedAt);
+}
