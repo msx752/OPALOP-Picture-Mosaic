@@ -14,6 +14,7 @@ public class RedisConnectionManager : IDisposable
 
     public IDatabase GetDatabase() => _connection.Value.GetDatabase();
     public ISubscriber GetSubscriber() => _connection.Value.GetSubscriber();
+    public IServer GetServer() => _connection.Value.GetServer(_connection.Value.GetEndPoints()[0]);
 
     public void Dispose()
     {

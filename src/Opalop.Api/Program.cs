@@ -15,6 +15,8 @@ builder.Services.AddAuthentication("Bearer")
         options.RequireHttpsMetadata = false;
     });
 builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("AdminPolicy", policy => policy.RequireRole("admin"));
 
 builder.Services.AddScoped<MosaicOrchestrator>();
 builder.Services.AddSignalR();
@@ -39,6 +41,7 @@ app.MapPhotoEndpoints();
 app.MapResourceEndpoints();
 app.MapMosaicEndpoints();
 app.MapAccountEndpoints();
+app.MapAdminEndpoints();
 app.MapHub<MosaicProgressHub>("/hubs/mosaic");
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
