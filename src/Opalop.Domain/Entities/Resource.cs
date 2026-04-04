@@ -12,4 +12,5 @@ public class Resource
     public DateTime UploadedAt { get; init; } = DateTime.UtcNow;
 
     public User User { get; init; } = null!;
+    public List<MosaicJob> MosaicJobs { get; init; } = [];
 }
