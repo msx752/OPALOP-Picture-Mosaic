@@ -1,0 +1,63 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Domain", "src\Opalop.Domain\Opalop.Domain.csproj", "{7961292E-F02E-4DCC-AE5C-868A7C044A4D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Application", "src\Opalop.Application\Opalop.Application.csproj", "{A2633CC9-7AF2-4F5A-8189-C18C27D31B9C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Infrastructure", "src\Opalop.Infrastructure\Opalop.Infrastructure.csproj", "{8745AF7F-8785-41AE-86E1-FD0DF73AADE2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Mosaic.Engine", "src\Opalop.Mosaic.Engine\Opalop.Mosaic.Engine.csproj", "{31A481CF-9CA9-4C7D-A469-0C2C0F449B00}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Api", "src\Opalop.Api\Opalop.Api.csproj", "{F0CFBB5F-652C-4965-962C-7C5F54DDA468}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Worker", "src\Opalop.Worker\Opalop.Worker.csproj", "{79A85BB6-4668-421C-A276-D8D631C1BECF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Domain.Tests", "tests\Opalop.Domain.Tests\Opalop.Domain.Tests.csproj", "{9BA499F9-FF58-4BFF-9B9B-4A5EED8A8EF4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Opalop.Infrastructure.Tests", "tests\Opalop.Infrastructure.Tests\Opalop.Infrastructure.Tests.csproj", "{05CB1F0D-F800-45DC-A909-8EDDE6658F15}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{07ECF644-6F62-4400-991A-38BFE6F48E69}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7961292E-F02E-4DCC-AE5C-868A7C044A4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7961292E-F02E-4DCC-AE5C-868A7C044A4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7961292E-F02E-4DCC-AE5C-868A7C044A4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7961292E-F02E-4DCC-AE5C-868A7C044A4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A2633CC9-7AF2-4F5A-8189-C18C27D31B9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A2633CC9-7AF2-4F5A-8189-C18C27D31B9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A2633CC9-7AF2-4F5A-8189-C18C27D31B9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A2633CC9-7AF2-4F5A-8189-C18C27D31B9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8745AF7F-8785-41AE-86E1-FD0DF73AADE2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8745AF7F-8785-41AE-86E1-FD0DF73AADE2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8745AF7F-8785-41AE-86E1-FD0DF73AADE2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8745AF7F-8785-41AE-86E1-FD0DF73AADE2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31A481CF-9CA9-4C7D-A469-0C2C0F449B00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31A481CF-9CA9-4C7D-A469-0C2C0F449B00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31A481CF-9CA9-4C7D-A469-0C2C0F449B00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31A481CF-9CA9-4C7D-A469-0C2C0F449B00}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0CFBB5F-652C-4965-962C-7C5F54DDA468}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0CFBB5F-652C-4965-962C-7C5F54DDA468}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0CFBB5F-652C-4965-962C-7C5F54DDA468}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0CFBB5F-652C-4965-962C-7C5F54DDA468}.Release|Any CPU.Build.0 = Release|Any CPU
+		{79A85BB6-4668-421C-A276-D8D631C1BECF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79A85BB6-4668-421C-A276-D8D631C1BECF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{79A85BB6-4668-421C-A276-D8D631C1BECF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79A85BB6-4668-421C-A276-D8D631C1BECF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9BA499F9-FF58-4BFF-9B9B-4A5EED8A8EF4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BA499F9-FF58-4BFF-9B9B-4A5EED8A8EF4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BA499F9-FF58-4BFF-9B9B-4A5EED8A8EF4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BA499F9-FF58-4BFF-9B9B-4A5EED8A8EF4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05CB1F0D-F800-45DC-A909-8EDDE6658F15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05CB1F0D-F800-45DC-A909-8EDDE6658F15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05CB1F0D-F800-45DC-A909-8EDDE6658F15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05CB1F0D-F800-45DC-A909-8EDDE6658F15}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

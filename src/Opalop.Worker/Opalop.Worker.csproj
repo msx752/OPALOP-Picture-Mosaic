@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <ItemGroup>
+    <ProjectReference Include="..\Opalop.Application\Opalop.Application.csproj" />
+    <ProjectReference Include="..\Opalop.Infrastructure\Opalop.Infrastructure.csproj" />
+    <ProjectReference Include="..\Opalop.Mosaic.Engine\Opalop.Mosaic.Engine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+</Project>
