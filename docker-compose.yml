@@ -1,29 +1,24 @@
-version: "3.9"
-
 services:
   opalop-api:
+    container_name: opalop-api
     build:
       context: .
       dockerfile: src/Opalop.Api/Dockerfile
     ports:
       - "5000:8080"
     environment:
-      - ConnectionStrings__PostgreSQL=Host=postgresql;Database=opalop;Username=opalop;Password=dev_password
-      - ConnectionStrings__Redis=redis:6379
-      - MinIO__Endpoint=minio:9000
-      - MinIO__AccessKey=minioadmin
-      - MinIO__SecretKey=minioadmin
-      - MinIO__UseSSL=false
-      - Keycloak__Authority=http://keycloak:8080/realms/opalop
-      - Keycloak__Audience=opalop-api
+      - ConnectionStrings__PostgreSQL=Host=opalop-db;Database=opalop;Username=opalop;Password=dev_password
+      - ConnectionStrings__Redis=opalop-redis:6379
+      - MinIO__Endpoint=opalop-minio:9000
+      - Keycloak__Authority=http://opalop-keycloak:8080/realms/opalop
     depends_on:
-      redis:
+      opalop-redis:
         condition: service_started
-      postgresql:
+      opalop-db:
         condition: service_healthy
-      minio:
+      opalop-minio:
         condition: service_started
-      keycloak:
+      opalop-keycloak:
         condition: service_started
 
   opalop-worker:
@@ -31,26 +26,21 @@ services:
       context: .
       dockerfile: src/Opalop.Worker/Dockerfile
     environment:
-      - ConnectionStrings__PostgreSQL=Host=postgresql;Database=opalop;Username=opalop;Password=dev_password
-      - ConnectionStrings__Redis=redis:6379
-      - MinIO__Endpoint=minio:9000
-      - MinIO__AccessKey=minioadmin
-      - MinIO__SecretKey=minioadmin
-      - MinIO__UseSSL=false
-      - Worker__ConsumerGroup=workers
-      - Worker__StreamKey=mosaic:tiles
-      - Worker__ClaimTimeout=30000
+      - ConnectionStrings__PostgreSQL=Host=opalop-db;Database=opalop;Username=opalop;Password=dev_password
+      - ConnectionStrings__Redis=opalop-redis:6379
+      - MinIO__Endpoint=opalop-minio:9000
     depends_on:
-      redis:
+      opalop-redis:
         condition: service_started
-      postgresql:
+      opalop-db:
         condition: service_healthy
-      minio:
+      opalop-minio:
         condition: service_started
     deploy:
       replicas: 2
 
-  redis:
+  opalop-redis:
+    container_name: opalop-redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -62,7 +52,8 @@ services:
     volumes:
       - redis-data:/data
 
-  postgresql:
+  opalop-db:
+    container_name: opalop-db
     image: postgres:16-alpine
     ports:
       - "5432:5432"
@@ -78,7 +69,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  minio:
+  opalop-minio:
+    container_name: opalop-minio
     image: minio/minio:latest
     ports:
       - "9000:9000"
@@ -90,14 +82,15 @@ services:
     volumes:
       - minio-data:/data
 
-  minio-init:
+  opalop-minio-init:
+    container_name: opalop-minio-init
     image: minio/mc:latest
     depends_on:
-      - minio
+      - opalop-minio
     entrypoint: >
       /bin/sh -c "
       sleep 5;
-      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc alias set local http://opalop-minio:9000 minioadmin minioadmin;
       mc mb --ignore-existing local/photos;
       mc mb --ignore-existing local/resources;
       mc mb --ignore-existing local/mosaics;
@@ -105,7 +98,8 @@ services:
       exit 0;
       "
 
-  keycloak:
+  opalop-keycloak:
+    container_name: opalop-keycloak
     image: quay.io/keycloak/keycloak:24.0
     ports:
       - "8080:8080"
