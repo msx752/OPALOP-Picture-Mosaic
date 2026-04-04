@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Opalop.Infrastructure.Persistence;
+using Opalop.Infrastructure.Redis;
 
 public static class ServiceRegistration
 {
@@ -17,6 +18,9 @@ public static class ServiceRegistration
         services.AddHealthChecks()
             .AddNpgSql(configuration.GetConnectionString("PostgreSQL")!, name: "postgresql")
             .AddRedis(configuration.GetConnectionString("Redis")!, name: "redis");
+
+        var redisConnection = configuration.GetConnectionString("Redis")!;
+        services.AddSingleton(new RedisConnectionManager(redisConnection));
 
         return services;
     }
