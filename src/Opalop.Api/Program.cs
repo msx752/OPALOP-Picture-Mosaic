@@ -20,6 +20,8 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("AdminPolicy", policy => policy.RequireRole("admin"));
 
 builder.Services.AddScoped<MosaicOrchestrator>();
+builder.Services.AddHttpClient("GooglePhotos");
+builder.Services.AddScoped<GooglePhotosImporter>();
 builder.Services.AddSignalR();
 
 builder.Services.AddEndpointsApiExplorer();
@@ -45,6 +47,7 @@ app.MapResourceEndpoints();
 app.MapMosaicEndpoints();
 app.MapAccountEndpoints();
 app.MapAdminEndpoints();
+app.MapImportEndpoints();
 app.MapHub<MosaicProgressHub>("/hubs/mosaic");
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
