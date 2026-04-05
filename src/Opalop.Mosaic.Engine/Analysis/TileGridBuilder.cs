@@ -5,11 +5,25 @@ using SkiaSharp;
 
 public record TileInfo(int Index, int X, int Y, ColorFingerprint Fingerprint);
 
+/// <summary>
+/// Output dimensions after upscale + tile-alignment.
+/// </summary>
+public record GridDimensions(int Width, int Height);
+
 public static class TileGridBuilder
 {
-    public static IReadOnlyList<TileInfo> Build(SKBitmap source, int tileSize, float blurSigma = 5f)
+    /// <summary>
+    /// Upscale percentage applied to the source image before tiling.
+    /// 100 = double the resolution (legacy default), giving 4x more tiles.
+    /// </summary>
+    private const int DefaultUpscalePercent = 100;
+
+    public static IReadOnlyList<TileInfo> Build(SKBitmap source, int tileSize,
+        int upscalePercent = DefaultUpscalePercent, float blurSigma = 5f)
     {
-        using var working = blurSigma > 0 ? ApplyBlur(source, blurSigma) : source.Copy();
+        // Legacy logic: enlarge source so smaller tiles fit, then snap to tile-aligned dimensions
+        using var upscaled = Upscale(source, tileSize, upscalePercent);
+        using var working = blurSigma > 0 ? ApplyBlur(upscaled, blurSigma) : upscaled.Copy();
 
         int cols = working.Width / tileSize;
         int rows = working.Height / tileSize;
@@ -34,6 +48,44 @@ public static class TileGridBuilder
         }
 
         return tiles;
+    }
+
+    /// <summary>
+    /// Calculates the output canvas dimensions after upscale + tile alignment.
+    /// Used by the assembler to size the final mosaic.
+    /// </summary>
+    public static GridDimensions CalculateDimensions(int sourceWidth, int sourceHeight,
+        int tileSize, int upscalePercent = DefaultUpscalePercent)
+    {
+        int w = sourceWidth + (sourceWidth / 100) * upscalePercent;
+        int h = sourceHeight + (sourceHeight / 100) * upscalePercent;
+        int alignedW = w - (w % tileSize);
+        int alignedH = h - (h % tileSize);
+        return new GridDimensions(alignedW, alignedH);
+    }
+
+    /// <summary>
+    /// Upscales the source image and snaps dimensions to tile-size multiples.
+    /// Legacy: yuzde=100 → 2x enlargement, then trim to nearest tile boundary.
+    /// </summary>
+    private static SKBitmap Upscale(SKBitmap source, int tileSize, int upscalePercent)
+    {
+        if (upscalePercent <= 0)
+        {
+            // No upscale — just align to tile boundary
+            int alignedW = source.Width - (source.Width % tileSize);
+            int alignedH = source.Height - (source.Height % tileSize);
+            return source.Resize(new SKImageInfo(alignedW, alignedH), SKSamplingOptions.Default)
+                   ?? source.Copy();
+        }
+
+        int w = source.Width + (source.Width / 100) * upscalePercent;
+        int h = source.Height + (source.Height / 100) * upscalePercent;
+        int newW = w - (w % tileSize);
+        int newH = h - (h % tileSize);
+
+        return source.Resize(new SKImageInfo(newW, newH), SKSamplingOptions.Default)
+               ?? source.Copy();
     }
 
     private static SKBitmap ApplyBlur(SKBitmap source, float sigma)

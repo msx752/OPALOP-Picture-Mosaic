@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Opalop.Application.Interfaces;
 using Opalop.Domain.Enums;
 using Opalop.Infrastructure.Persistence;
+using Opalop.Mosaic.Engine.Analysis;
 using Opalop.Mosaic.Engine.ColorSpace;
 using Opalop.Mosaic.Engine.Compositing;
 using Opalop.Mosaic.Engine.Matching;
@@ -106,16 +107,21 @@ public sealed class TileProcessorService(
         return CreateSolidColorTile(tile.Fingerprint, pxFormat);
     }
 
+    /// <summary>
+    /// DeltaE threshold for "weak match" — above this, apply color-fill base + higher opacity overlay.
+    /// This mirrors the legacy fallback behavior where poorly matched tiles get a target-colored
+    /// background with the photo drawn at increased opacity (+20%).
+    /// </summary>
+    private const float WeakMatchThreshold = 40f;
+
     private async Task<SKBitmap> CreateMatchedTileAsync(
         ColorMatchResult match, Domain.ValueObjects.ColorFingerprint targetFingerprint,
         int pxFormat, CancellationToken ct)
     {
-        var tilePath = $"{match.PhotoId}";
         Stream photoStream;
 
         try
         {
-            // Try downloading the pre-generated tile first
             var tileStoragePath = await FindPhotoTilePathAsync(match.PhotoId, ct);
             if (tileStoragePath is not null)
             {
@@ -123,12 +129,9 @@ public sealed class TileProcessorService(
             }
             else
             {
-                // Fallback: download original photo
                 var storagePath = await FindPhotoStoragePathAsync(match.PhotoId, ct);
                 if (storagePath is null)
-                {
                     return CreateSolidColorTile(targetFingerprint, pxFormat);
-                }
                 photoStream = await photoStorage.DownloadAsync(PhotoBucket, storagePath, ct);
             }
         }
@@ -142,25 +145,36 @@ public sealed class TileProcessorService(
         {
             using var photoBitmap = SKBitmap.Decode(photoStream);
             if (photoBitmap is null)
-            {
                 return CreateSolidColorTile(targetFingerprint, pxFormat);
-            }
 
             var resized = photoBitmap.Resize(new SKImageInfo(pxFormat, pxFormat), SKSamplingOptions.Default);
             if (resized is null)
-            {
                 return CreateSolidColorTile(targetFingerprint, pxFormat);
-            }
 
             var rotation = SmartRotator.DetermineRotation(targetFingerprint, match.Fingerprint);
+            var isWeakMatch = match.DeltaE > WeakMatchThreshold;
+
+            if (isWeakMatch)
+            {
+                // Legacy fallback: fill with target color, then draw tile at higher opacity
+                var (r, g, b) = LabConverter.LabToRgb(targetFingerprint.Total);
+                var canvas = new SKBitmap(pxFormat, pxFormat);
+                using var canvasGraphics = new SKCanvas(canvas);
+                canvasGraphics.Clear(new SKColor(r, g, b));
+
+                // Draw photo at ~70% opacity on top of color fill (legacy: opacity + 20)
+                TileCompositor.Composite(canvas, resized, 0, 0, rotation, opacity: 179);
+                resized.Dispose();
+                return canvas;
+            }
 
             if (rotation == RotationAngle.None)
                 return resized;
 
-            var canvas = new SKBitmap(pxFormat, pxFormat);
-            TileCompositor.Composite(canvas, resized, 0, 0, rotation, opacity: 255);
+            var rotatedCanvas = new SKBitmap(pxFormat, pxFormat);
+            TileCompositor.Composite(rotatedCanvas, resized, 0, 0, rotation, opacity: 255);
             resized.Dispose();
-            return canvas;
+            return rotatedCanvas;
         }
     }
 
@@ -196,6 +210,7 @@ public sealed class TileProcessorService(
 
         try
         {
+            string resourceStoragePath;
             int canvasWidth;
             int canvasHeight;
 
@@ -215,11 +230,14 @@ public sealed class TileProcessorService(
 
                 canvasWidth = job.Resource.Width;
                 canvasHeight = job.Resource.Height;
+                resourceStoragePath = job.Resource.StoragePath;
             }
 
             var pxFormat = jobInfo.PxFormat;
-            var colCount = canvasWidth / pxFormat;
-            var rowCount = canvasHeight / pxFormat;
+            // Calculate upscaled + tile-aligned canvas dimensions (matches TileGridBuilder.Build)
+            var gridDims = TileGridBuilder.CalculateDimensions(canvasWidth, canvasHeight, pxFormat);
+            var colCount = gridDims.Width / pxFormat;
+            var rowCount = gridDims.Height / pxFormat;
 
             for (var i = 0; i < jobInfo.TotalTiles; i++)
             {
@@ -238,7 +256,22 @@ public sealed class TileProcessorService(
                 processedTiles.Add(new ProcessedTile(col * pxFormat, row * pxFormat, tileBitmap));
             }
 
-            using var mosaicBitmap = MosaicAssembler.Assemble(processedTiles, canvasWidth, canvasHeight, pxFormat);
+            // Download original source image to use as canvas base (tiles drawn on top with transparency)
+            SKBitmap? sourceBitmap = null;
+            try
+            {
+                await using var sourceStream = await photoStorage.DownloadAsync("resources", resourceStoragePath, ct);
+                sourceBitmap = SKBitmap.Decode(sourceStream);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to download source image for transparency overlay, falling back to blank canvas");
+            }
+
+            using var mosaicBitmap = sourceBitmap is not null
+                ? MosaicAssembler.Assemble(processedTiles, sourceBitmap, gridDims.Width, gridDims.Height, jobInfo.Opacity)
+                : MosaicAssembler.Assemble(processedTiles, gridDims.Width, gridDims.Height);
+            sourceBitmap?.Dispose();
 
             using var mosaicImage = SKImage.FromBitmap(mosaicBitmap);
             var encodedData = mosaicImage.Encode(SKEncodedImageFormat.Jpeg, 90);

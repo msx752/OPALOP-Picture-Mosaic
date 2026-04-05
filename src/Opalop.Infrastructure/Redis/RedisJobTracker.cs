@@ -12,7 +12,7 @@ public class RedisJobTracker : IJobTracker
         _connectionManager = connectionManager;
     }
 
-    public async Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, CancellationToken ct = default)
+    public async Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, byte opacity, CancellationToken ct = default)
     {
         var db = _connectionManager.GetDatabase();
         var key = JobKey(jobId);
@@ -24,6 +24,7 @@ public class RedisJobTracker : IJobTracker
             new("completed", 0),
             new("user_id", userId.ToString()),
             new("px_format", pxFormat),
+            new("opacity", (int)opacity),
             new("status", "processing"),
         };
 
@@ -58,6 +59,7 @@ public class RedisJobTracker : IJobTracker
             CompletedTiles: int.Parse(dict["completed"]),
             UserId: Guid.Parse(dict["user_id"]),
             PxFormat: int.Parse(dict["px_format"]),
+            Opacity: dict.TryGetValue("opacity", out var opStr) ? byte.Parse(opStr) : (byte)128,
             Status: dict["status"]);
     }
 

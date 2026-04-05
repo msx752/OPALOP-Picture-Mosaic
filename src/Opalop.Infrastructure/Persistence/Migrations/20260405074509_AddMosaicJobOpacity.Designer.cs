@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Opalop.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Opalop.Infrastructure.Persistence;
 namespace Opalop.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(OpalopDbContext))]
-    partial class OpalopDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260405074509_AddMosaicJobOpacity")]
+    partial class AddMosaicJobOpacity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

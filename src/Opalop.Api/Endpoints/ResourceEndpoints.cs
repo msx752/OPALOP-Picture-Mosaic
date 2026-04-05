@@ -35,20 +35,22 @@ public static class ResourceEndpoints
 
         var userId = await PhotoEndpoints.GetUserIdAsync(principal, db, ct);
 
-        await using var stream = file.OpenReadStream();
-        using var bitmap = SKBitmap.Decode(stream);
+        var bytes = new byte[file.Length];
+        await using (var stream = file.OpenReadStream())
+            await stream.ReadExactlyAsync(bytes, ct);
+
+        using var bitmap = SKBitmap.Decode(bytes);
         if (bitmap is null)
             return Results.BadRequest("Invalid image file.");
 
         var width = bitmap.Width;
         var height = bitmap.Height;
 
-        stream.Position = 0;
-
         var resourceId = Guid.NewGuid();
         var storagePath = $"{userId}/{resourceId}{Path.GetExtension(file.FileName)}";
 
-        await photoStorage.UploadAsync(ResourceBucket, storagePath, stream, file.ContentType, ct);
+        using var uploadStream = new MemoryStream(bytes);
+        await photoStorage.UploadAsync(ResourceBucket, storagePath, uploadStream, file.ContentType, ct);
 
         var resource = new Resource
         {

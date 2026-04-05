@@ -32,7 +32,7 @@ public static class MosaicEndpoints
 
         try
         {
-            var jobId = await orchestrator.GenerateAsync(userId, request.ResourceId, request.PxFormat, ct);
+            var jobId = await orchestrator.GenerateAsync(userId, request.ResourceId, request.PxFormat, request.Opacity, ct);
             return Results.Accepted($"/api/mosaic/{jobId}/status", new { jobId });
         }
         catch (InvalidOperationException ex)
@@ -123,4 +123,4 @@ public static class MosaicEndpoints
     }
 }
 
-public record GenerateRequest(Guid ResourceId, int PxFormat);
+public record GenerateRequest(Guid ResourceId, int PxFormat, byte? Opacity = null);

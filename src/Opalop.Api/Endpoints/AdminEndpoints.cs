@@ -114,7 +114,7 @@ public static class AdminEndpoints
 
         await db.SaveChangesAsync(ct);
 
-        await jobTracker.InitJobAsync(job.Id, job.TotalTiles, job.UserId, job.PxFormat.Size, ct);
+        await jobTracker.InitJobAsync(job.Id, job.TotalTiles, job.UserId, job.PxFormat.Size, job.Opacity, ct);
 
         return Results.Ok(new { jobId = job.Id, status = job.Status.ToString() });
     }

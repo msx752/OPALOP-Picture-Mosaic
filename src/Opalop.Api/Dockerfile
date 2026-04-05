@@ -11,6 +11,7 @@ COPY src/ src/
 RUN dotnet publish src/Opalop.Api/Opalop.Api.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine
+RUN apk add --no-cache icu-libs fontconfig freetype
 WORKDIR /app
 COPY --from=build /app .
 EXPOSE 8080

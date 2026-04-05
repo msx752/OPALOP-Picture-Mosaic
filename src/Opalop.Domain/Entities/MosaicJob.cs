@@ -10,6 +10,7 @@ public class MosaicJob
     public Guid ResourceId { get; init; }
     public JobStatus Status { get; set; } = JobStatus.Queued;
     public PixFormat PxFormat { get; init; } = PixFormat.Default;
+    public byte Opacity { get; init; } = 128;
     public int TotalTiles { get; set; }
     public int CompletedTiles { get; set; }
     public string? ResultPath { get; set; }

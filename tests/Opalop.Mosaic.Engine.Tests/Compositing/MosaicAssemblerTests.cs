@@ -66,7 +66,7 @@ public class MosaicAssemblerTests
             CreateTile(100, 100, 100, SKColors.Yellow)
         };
 
-        using var result = MosaicAssembler.Assemble(tiles, 200, 200, 100);
+        using var result = MosaicAssembler.Assemble(tiles, 200, 200);
 
         result.Width.Should().Be(200);
         result.Height.Should().Be(200);
@@ -82,7 +82,7 @@ public class MosaicAssemblerTests
             CreateTile(100, 0, 100, SKColors.Blue)
         };
 
-        using var result = MosaicAssembler.Assemble(tiles, 200, 100, 100);
+        using var result = MosaicAssembler.Assemble(tiles, 200, 100);
 
         result.GetPixel(50, 50).Red.Should().BeGreaterThan(200);
         result.GetPixel(150, 50).Blue.Should().BeGreaterThan(200);

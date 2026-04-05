@@ -2,7 +2,7 @@ namespace Opalop.Application.Interfaces;
 
 public interface IJobTracker
 {
-    Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, CancellationToken ct = default);
+    Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, byte opacity, CancellationToken ct = default);
     Task<int> IncrementCompletedAsync(Guid jobId, CancellationToken ct = default);
     Task<JobInfo?> GetJobInfoAsync(Guid jobId, CancellationToken ct = default);
     Task SetJobCompletedAsync(Guid jobId, string resultPath, CancellationToken ct = default);
@@ -11,4 +11,4 @@ public interface IJobTracker
     Task ReleaseLockAsync(Guid userId, CancellationToken ct = default);
 }
 
-public record JobInfo(Guid JobId, int TotalTiles, int CompletedTiles, Guid UserId, int PxFormat, string Status);
+public record JobInfo(Guid JobId, int TotalTiles, int CompletedTiles, Guid UserId, int PxFormat, byte Opacity, string Status);

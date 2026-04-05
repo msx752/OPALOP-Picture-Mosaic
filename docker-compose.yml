@@ -11,6 +11,8 @@ services:
       - ConnectionStrings__Redis=opalop-redis:6379
       - MinIO__Endpoint=opalop-minio:9000
       - Keycloak__Authority=http://opalop-keycloak:8080/realms/opalop
+      - Keycloak__ValidIssuers__0=http://localhost:8080/realms/opalop
+      - Keycloak__ValidIssuers__1=http://opalop-keycloak:8080/realms/opalop
     depends_on:
       opalop-redis:
         condition: service_started

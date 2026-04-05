@@ -28,7 +28,7 @@ public class RedisJobTrackerTests : IAsyncLifetime
     public async Task InitAndGetJob_ReturnsCorrectInfo()
     {
         var jobId = Guid.NewGuid();
-        await _tracker.InitJobAsync(jobId, 64, Guid.NewGuid(), 94);
+        await _tracker.InitJobAsync(jobId, 64, Guid.NewGuid(), 94, 128);
         var info = await _tracker.GetJobInfoAsync(jobId);
         info.Should().NotBeNull();
         info!.TotalTiles.Should().Be(64);
@@ -40,7 +40,7 @@ public class RedisJobTrackerTests : IAsyncLifetime
     public async Task IncrementCompleted_ReturnsNewCount()
     {
         var jobId = Guid.NewGuid();
-        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94);
+        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94, 128);
         (await _tracker.IncrementCompletedAsync(jobId)).Should().Be(1);
         (await _tracker.IncrementCompletedAsync(jobId)).Should().Be(2);
     }
@@ -66,7 +66,7 @@ public class RedisJobTrackerTests : IAsyncLifetime
     public async Task SetJobCompleted_UpdatesStatus()
     {
         var jobId = Guid.NewGuid();
-        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94);
+        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94, 128);
         await _tracker.SetJobCompletedAsync(jobId, "mosaics/result.jpg");
         var info = await _tracker.GetJobInfoAsync(jobId);
         info!.Status.Should().Be("completed");
@@ -76,7 +76,7 @@ public class RedisJobTrackerTests : IAsyncLifetime
     public async Task SetJobFailed_UpdatesStatus()
     {
         var jobId = Guid.NewGuid();
-        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94);
+        await _tracker.InitJobAsync(jobId, 10, Guid.NewGuid(), 94, 128);
         await _tracker.SetJobFailedAsync(jobId, "Something went wrong");
         var info = await _tracker.GetJobInfoAsync(jobId);
         info!.Status.Should().Be("failed");
