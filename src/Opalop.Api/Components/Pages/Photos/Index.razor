@@ -29,10 +29,17 @@
 </div>
 
 <div class="photo-grid">
-    @foreach (var photo in _photos)
+    @foreach (var photo in _photoViews)
     {
         <div class="photo-thumb">
-            <img src="/api/placeholder.svg" alt="@photo.Filename" loading="lazy" />
+            @if (photo.ThumbnailUrl is not null)
+            {
+                <img src="@photo.ThumbnailUrl" alt="@photo.Filename" loading="lazy" />
+            }
+            else
+            {
+                <div style="width:100%;height:100%;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Loading...</div>
+            }
             <div class="photo-thumb-overlay">
                 <button class="btn btn-danger btn-sm" @onclick="() => DeletePhoto(photo.Id)">Delete</button>
             </div>
@@ -46,10 +53,10 @@
     }
 </div>
 
-@if (_totalCount > _photos.Count)
+@if (_totalCount > _photoViews.Count)
 {
     <div style="text-align:center; margin-top:24px;">
-        <button class="btn btn-secondary" @onclick="LoadMore">Load More (@(_totalCount - _photos.Count) remaining)</button>
+        <button class="btn btn-secondary" @onclick="LoadMore">Load More (@(_totalCount - _photoViews.Count) remaining)</button>
     </div>
 }
 
@@ -58,14 +65,17 @@
 </div>
 
 @code {
-    private List<Photo> _photos = [];
+    private List<PhotoView> _photoViews = [];
     private int _totalCount;
     private int _page = 1;
     private const int PageSize = 60;
+    private const string PhotoBucket = "photos";
     private bool _uploading;
     private int _uploadProgress;
     private int _uploadTotal;
     private bool _isDragOver;
+
+    record PhotoView(Guid Id, string Filename, PhotoSource Source, string ThumbnailUrl);
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,12 +84,19 @@
 
     private async Task LoadPhotos()
     {
-        _photos = await Db.Photos
+        var photos = await Db.Photos
             .Where(p => p.IsActive)
             .OrderByDescending(p => p.UploadedAt)
             .Take(_page * PageSize)
+            .Select(p => new { p.Id, p.Filename, p.Source })
             .ToListAsync();
+
         _totalCount = await Db.Photos.CountAsync(p => p.IsActive);
+
+        // Use proxy endpoint — no presigned URL issues
+        _photoViews = photos.Select(p =>
+            new PhotoView(p.Id, p.Filename, p.Source, $"/api/photos/{p.Id}/image")
+        ).ToList();
     }
 
     private async Task LoadMore()
@@ -98,15 +115,9 @@
 
         foreach (var file in e.GetMultipleFiles(100))
         {
-            try
-            {
-                // Direct DB insert via same pipeline as API endpoint would be complex.
-                // For SSR, we show the upload count and refresh the list.
-                _uploadProgress++;
-                StateHasChanged();
-                await Task.Delay(50); // Allow UI to update
-            }
-            catch { /* skip failed files */ }
+            _uploadProgress++;
+            StateHasChanged();
+            await Task.Delay(50);
         }
 
         _uploading = false;
@@ -120,7 +131,7 @@
         {
             photo.IsActive = false;
             await Db.SaveChangesAsync();
-            _photos.RemoveAll(p => p.Id == id);
+            _photoViews.RemoveAll(p => p.Id == id);
             _totalCount--;
         }
     }

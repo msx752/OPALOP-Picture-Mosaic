@@ -22,6 +22,7 @@ public static class PhotoEndpoints
         group.MapPost("/upload", UploadAsync).DisableAntiforgery();
         group.MapGet("/", ListAsync);
         group.MapGet("/{id}/thumbnail", GetThumbnailAsync);
+        group.MapGet("/{id}/image", GetImageAsync).AllowAnonymous();
         group.MapDelete("/{id}", DeleteAsync);
     }
 
@@ -234,6 +235,22 @@ public static class PhotoEndpoints
 
         var url = await photoStorage.GetPresignedUrlAsync(PhotoBucket, photo.StoragePath, 3600, ct);
         return Results.Ok(new { url });
+    }
+
+    private static async Task<IResult> GetImageAsync(
+        Guid id,
+        OpalopDbContext db,
+        IPhotoStorage photoStorage,
+        CancellationToken ct)
+    {
+        var photo = await db.Photos
+            .FirstOrDefaultAsync(p => p.Id == id && p.IsActive, ct);
+
+        if (photo is null)
+            return Results.NotFound();
+
+        var stream = await photoStorage.DownloadAsync(PhotoBucket, photo.StoragePath, ct);
+        return Results.Stream(stream, "image/webp");
     }
 
     private static async Task<IResult> DeleteAsync(

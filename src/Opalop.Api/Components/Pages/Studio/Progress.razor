@@ -1,6 +1,5 @@
 @page "/studio/{JobId:guid}"
 @inject Opalop.Application.Interfaces.IJobTracker JobTracker
-@inject Opalop.Application.Interfaces.IPhotoStorage PhotoStorage
 @inject OpalopDbContext Db
 @rendermode InteractiveServer
 @implements IAsyncDisposable
@@ -87,7 +86,7 @@
             var job = await Db.MosaicJobs.FirstOrDefaultAsync(j => j.Id == JobId);
             if (job?.ResultPath is not null)
             {
-                _resultUrl = await PhotoStorage.GetPresignedUrlAsync("mosaics", job.ResultPath, 3600);
+                _resultUrl = $"/api/mosaic/{JobId}/image";
                 _durationMs = job.DurationMs ?? 0;
             }
         }

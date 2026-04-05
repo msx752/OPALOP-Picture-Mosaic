@@ -12,7 +12,7 @@ else
     <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
         <div>
             <h1>@_collection.Name</h1>
-            <p>@(_collection.Description ?? "No description") &mdash; @_photos.Count photos</p>
+            <p>@(_collection.Description ?? "No description") &mdash; @_photoViews.Count photos</p>
         </div>
         <div style="display:flex; gap:8px;">
             <a href="/studio?collectionId=@Id" class="btn btn-primary">Create Mosaic</a>
@@ -21,10 +21,17 @@ else
     </div>
 
     <div class="photo-grid">
-        @foreach (var photo in _photos)
+        @foreach (var photo in _photoViews)
         {
             <div class="photo-thumb">
-                <img src="/api/placeholder.svg" alt="@photo.Filename" loading="lazy" />
+                @if (photo.Url is not null)
+                {
+                    <img src="@photo.Url" alt="@photo.Filename" loading="lazy" />
+                }
+                else
+                {
+                    <div style="width:100%;height:100%;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">...</div>
+                }
                 <div class="photo-thumb-overlay">
                     <button class="btn btn-danger btn-sm" @onclick="() => RemovePhoto(photo.Id)">Remove</button>
                 </div>
@@ -32,7 +39,7 @@ else
         }
     </div>
 
-    @if (_photos.Count == 0)
+    @if (_photoViews.Count == 0)
     {
         <div class="card" style="text-align:center; padding:40px;">
             <p style="color:var(--muted);">No photos in this collection. Add photos from the <a href="/photos">Photo Library</a>.</p>
@@ -43,15 +50,17 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
     private PhotoCollection? _collection;
-    private List<Photo> _photos = [];
+    private List<PhotoView> _photoViews = [];
+    record PhotoView(Guid Id, string Filename, string Url);
 
     protected override async Task OnInitializedAsync()
     {
         _collection = await Db.PhotoCollections.FirstOrDefaultAsync(c => c.Id == Id);
         if (_collection is null) return;
-        _photos = await Db.Photos
+        _photoViews = await Db.Photos
             .Where(p => p.CollectionId == Id && p.IsActive)
             .OrderByDescending(p => p.UploadedAt)
+            .Select(p => new PhotoView(p.Id, p.Filename, $"/api/photos/{p.Id}/image"))
             .ToListAsync();
     }
 
@@ -59,7 +68,7 @@ else
     {
         await Db.Photos.Where(p => p.Id == photoId && p.CollectionId == Id)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.CollectionId, (Guid?)null));
-        _photos.RemoveAll(p => p.Id == photoId);
+        _photoViews.RemoveAll(p => p.Id == photoId);
     }
 
     private async Task DeleteCollection()

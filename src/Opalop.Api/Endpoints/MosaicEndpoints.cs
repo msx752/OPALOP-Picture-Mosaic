@@ -17,6 +17,7 @@ public static class MosaicEndpoints
         group.MapPost("/generate", GenerateAsync);
         group.MapGet("/{jobId}/status", GetStatusAsync);
         group.MapGet("/{jobId}/result", GetResultAsync);
+        group.MapGet("/{jobId}/image", GetImageAsync).AllowAnonymous();
         group.MapGet("/history", GetHistoryAsync);
         group.MapGet("/formats", GetFormats).AllowAnonymous();
     }
@@ -86,6 +87,20 @@ public static class MosaicEndpoints
 
         var url = await photoStorage.GetPresignedUrlAsync(MosaicBucket, job.ResultPath, 3600, ct);
         return Results.Ok(new { url });
+    }
+
+    private static async Task<IResult> GetImageAsync(
+        Guid jobId,
+        OpalopDbContext db,
+        IPhotoStorage photoStorage,
+        CancellationToken ct)
+    {
+        var job = await db.MosaicJobs.FirstOrDefaultAsync(j => j.Id == jobId, ct);
+        if (job is null || string.IsNullOrEmpty(job.ResultPath))
+            return Results.NotFound();
+
+        var stream = await photoStorage.DownloadAsync(MosaicBucket, job.ResultPath, ct);
+        return Results.Stream(stream, "image/jpeg");
     }
 
     private static async Task<IResult> GetHistoryAsync(
