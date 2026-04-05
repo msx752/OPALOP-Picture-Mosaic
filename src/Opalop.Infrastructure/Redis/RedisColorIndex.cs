@@ -238,38 +238,49 @@ return 1
     private static string UsageKey(Guid jobId) => $"job:{jobId}:usage";
     private static string PositionsKey(Guid jobId, string photoIdStr) => $"job:{jobId}:pos:{photoIdStr}";
 
-    private static HashEntry[] FingerprintToHashEntries(ColorFingerprint fp) =>
-    [
-        new("total_L", (double)fp.Total.L),
-        new("total_a", (double)fp.Total.A),
-        new("total_b", (double)fp.Total.B),
-        new("q0_L", (double)fp.TopLeft.L),
-        new("q0_a", (double)fp.TopLeft.A),
-        new("q0_b", (double)fp.TopLeft.B),
-        new("q1_L", (double)fp.TopRight.L),
-        new("q1_a", (double)fp.TopRight.A),
-        new("q1_b", (double)fp.TopRight.B),
-        new("q2_L", (double)fp.BottomLeft.L),
-        new("q2_a", (double)fp.BottomLeft.A),
-        new("q2_b", (double)fp.BottomLeft.B),
-        new("q3_L", (double)fp.BottomRight.L),
-        new("q3_a", (double)fp.BottomRight.A),
-        new("q3_b", (double)fp.BottomRight.B),
-    ];
+    private static HashEntry[] FingerprintToHashEntries(ColorFingerprint fp)
+    {
+        var entries = new List<HashEntry>
+        {
+            new("total_L", (double)fp.Total.L),
+            new("total_a", (double)fp.Total.A),
+            new("total_b", (double)fp.Total.B),
+            new("region_count", fp.Regions.Length),
+        };
+
+        for (int i = 0; i < fp.Regions.Length; i++)
+        {
+            entries.Add(new($"r{i}_L", (double)fp.Regions[i].L));
+            entries.Add(new($"r{i}_a", (double)fp.Regions[i].A));
+            entries.Add(new($"r{i}_b", (double)fp.Regions[i].B));
+        }
+
+        return entries.ToArray();
+    }
 
     private static ColorFingerprint HashEntriesToFingerprint(HashEntry[] entries)
     {
         var dict = new Dictionary<string, float>(entries.Length);
         foreach (var entry in entries)
-        {
             dict[entry.Name.ToString()] = (float)(double)entry.Value;
+
+        var total = new QuadrantLab(dict["total_L"], dict["total_a"], dict["total_b"]);
+        int regionCount = dict.ContainsKey("region_count") ? (int)dict["region_count"] : 4;
+
+        // Support both legacy 4-region (q0-q3) and new 9-region (r0-r8) formats
+        if (dict.ContainsKey("r0_L"))
+        {
+            var regions = new QuadrantLab[regionCount];
+            for (int i = 0; i < regionCount; i++)
+                regions[i] = new QuadrantLab(dict[$"r{i}_L"], dict[$"r{i}_a"], dict[$"r{i}_b"]);
+            return new ColorFingerprint(total, regions);
         }
 
-        return new ColorFingerprint(
-            Total: new QuadrantLab(dict["total_L"], dict["total_a"], dict["total_b"]),
-            TopLeft: new QuadrantLab(dict["q0_L"], dict["q0_a"], dict["q0_b"]),
-            TopRight: new QuadrantLab(dict["q1_L"], dict["q1_a"], dict["q1_b"]),
-            BottomLeft: new QuadrantLab(dict["q2_L"], dict["q2_a"], dict["q2_b"]),
-            BottomRight: new QuadrantLab(dict["q3_L"], dict["q3_a"], dict["q3_b"]));
+        // Legacy fallback: 4-quadrant format
+        return new ColorFingerprint(total,
+            new QuadrantLab(dict["q0_L"], dict["q0_a"], dict["q0_b"]),
+            new QuadrantLab(dict["q1_L"], dict["q1_a"], dict["q1_b"]),
+            new QuadrantLab(dict["q2_L"], dict["q2_a"], dict["q2_b"]),
+            new QuadrantLab(dict["q3_L"], dict["q3_a"], dict["q3_b"]));
     }
 }

@@ -7,6 +7,7 @@ using Opalop.Domain.Entities;
 using Opalop.Domain.Enums;
 using Opalop.Infrastructure.Persistence;
 using Opalop.Mosaic.Engine.Analysis;
+using Opalop.Mosaic.Engine.Augmentation;
 using SkiaSharp;
 
 public static class PhotoEndpoints
@@ -145,10 +146,47 @@ public static class PhotoEndpoints
 
         await colorIndex.AddPhotoAsync(userId, photoId, fingerprint, ct);
 
+        // Generate augmented variants (brightness ±15%, horizontal flip) to expand color library
+        var variants = PhotoAugmenter.Generate(resized);
+        foreach (var variant in variants)
+        {
+            var variantId = Guid.NewGuid();
+            var variantFingerprint = QuadrantAnalyzer.Analyze(variant.Bitmap);
+            var variantTilePath = $"{userId}/tiles/{variantId}.webp";
+
+            using var variantStream = new MemoryStream();
+            using (var variantImage = SKImage.FromBitmap(variant.Bitmap))
+            {
+                var variantData = variantImage.Encode(SKEncodedImageFormat.Webp, 80);
+                variantData.SaveTo(variantStream);
+            }
+            variantStream.Position = 0;
+            await photoStorage.UploadAsync(PhotoBucket, variantTilePath, variantStream, "image/webp", ct);
+
+            var variantPhoto = new Photo
+            {
+                Id = variantId,
+                UserId = userId,
+                Filename = $"{Path.GetFileNameWithoutExtension(file.FileName)}_{variant.Suffix}{Path.GetExtension(file.FileName)}",
+                Source = PhotoSource.Upload,
+                StoragePath = storagePath,
+                TilePath = variantTilePath,
+                TotalL = variantFingerprint.Total.L,
+                TotalA = variantFingerprint.Total.A,
+                TotalB = variantFingerprint.Total.B,
+                Quadrants = [variantFingerprint.TopLeft, variantFingerprint.TopRight,
+                             variantFingerprint.BottomLeft, variantFingerprint.BottomRight]
+            };
+            db.Photos.Add(variantPhoto);
+            await colorIndex.AddPhotoAsync(userId, variantId, variantFingerprint, ct);
+            variant.Bitmap.Dispose();
+        }
+        await db.SaveChangesAsync(ct);
+
         resized.Dispose();
         cropped.Dispose();
 
-        return Results.Created($"/api/photos/{photoId}", new { photoId });
+        return Results.Created($"/api/photos/{photoId}", new { photoId, variants = variants.Count });
     }
 
     private static async Task<IResult> ListAsync(

@@ -1,28 +1,37 @@
 namespace Opalop.Mosaic.Engine.Analysis;
 
-using System.Runtime.InteropServices;
 using Opalop.Domain.ValueObjects;
 using Opalop.Mosaic.Engine.ColorSpace;
 using SkiaSharp;
 
 public static class QuadrantAnalyzer
 {
+    private const int GridSize = 3; // 3x3 = 9 regions
+
     public static ColorFingerprint Analyze(SKBitmap bitmap)
     {
-        int halfW = bitmap.Width / 2;
-        int halfH = bitmap.Height / 2;
         int w = bitmap.Width;
         int h = bitmap.Height;
-
         var pixels = bitmap.GetPixelSpan();
 
-        var topLeft = AverageRegion(pixels, w, 0, 0, halfW, halfH);
-        var topRight = AverageRegion(pixels, w, halfW, 0, w - halfW, halfH);
-        var bottomLeft = AverageRegion(pixels, w, 0, halfH, halfW, h - halfH);
-        var bottomRight = AverageRegion(pixels, w, halfW, halfH, w - halfW, h - halfH);
-        var total = AverageRegion(pixels, w, 0, 0, w, h);
+        var regions = new QuadrantLab[GridSize * GridSize];
+        int cellW = w / GridSize;
+        int cellH = h / GridSize;
 
-        return new ColorFingerprint(total, topLeft, topRight, bottomLeft, bottomRight);
+        for (int row = 0; row < GridSize; row++)
+        {
+            for (int col = 0; col < GridSize; col++)
+            {
+                int startX = col * cellW;
+                int startY = row * cellH;
+                int regionW = (col == GridSize - 1) ? w - startX : cellW;
+                int regionH = (row == GridSize - 1) ? h - startY : cellH;
+                regions[row * GridSize + col] = AverageRegion(pixels, w, startX, startY, regionW, regionH);
+            }
+        }
+
+        var total = AverageRegion(pixels, w, 0, 0, w, h);
+        return new ColorFingerprint(total, regions);
     }
 
     private static QuadrantLab AverageRegion(ReadOnlySpan<byte> pixels, int stride,

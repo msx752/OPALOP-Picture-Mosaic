@@ -10,9 +10,7 @@ public class ColorFingerprintTests
     public void DeltaE_IdenticalFingerprints_ReturnsZero()
     {
         var quad = new QuadrantLab(50.0f, 20.0f, -10.0f);
-        var fp = new ColorFingerprint(
-            Total: quad, TopLeft: quad, TopRight: quad,
-            BottomLeft: quad, BottomRight: quad);
+        var fp = new ColorFingerprint(quad, quad, quad, quad, quad);
         fp.WeightedDeltaE(fp).Should().Be(0f);
     }
 
@@ -20,17 +18,17 @@ public class ColorFingerprintTests
     public void DeltaE_DifferentFingerprints_ReturnsPositiveValue()
     {
         var fp1 = new ColorFingerprint(
-            Total: new QuadrantLab(50f, 20f, -10f),
-            TopLeft: new QuadrantLab(55f, 22f, -8f),
-            TopRight: new QuadrantLab(45f, 18f, -12f),
-            BottomLeft: new QuadrantLab(52f, 21f, -9f),
-            BottomRight: new QuadrantLab(48f, 19f, -11f));
+            new QuadrantLab(50f, 20f, -10f),
+            new QuadrantLab(55f, 22f, -8f),
+            new QuadrantLab(45f, 18f, -12f),
+            new QuadrantLab(52f, 21f, -9f),
+            new QuadrantLab(48f, 19f, -11f));
         var fp2 = new ColorFingerprint(
-            Total: new QuadrantLab(70f, 10f, 5f),
-            TopLeft: new QuadrantLab(75f, 12f, 7f),
-            TopRight: new QuadrantLab(65f, 8f, 3f),
-            BottomLeft: new QuadrantLab(72f, 11f, 6f),
-            BottomRight: new QuadrantLab(68f, 9f, 4f));
+            new QuadrantLab(70f, 10f, 5f),
+            new QuadrantLab(75f, 12f, 7f),
+            new QuadrantLab(65f, 8f, 3f),
+            new QuadrantLab(72f, 11f, 6f),
+            new QuadrantLab(68f, 9f, 4f));
         fp1.WeightedDeltaE(fp2).Should().BeGreaterThan(0f);
     }
 
