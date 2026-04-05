@@ -1,0 +1,13 @@
+@* Shared progress bar component *@
+<div class="progress-bar">
+    <div class="progress-fill" style="width: @($"{Value:F1}")%"></div>
+</div>
+@if (!string.IsNullOrEmpty(Label))
+{
+    <div style="font-size:12px; color:var(--muted); margin-top:4px;">@Label</div>
+}
+
+@code {
+    [Parameter] public double Value { get; set; }
+    [Parameter] public string? Label { get; set; }
+}

@@ -1,0 +1,71 @@
+@page "/history"
+@inject OpalopDbContext Db
+
+<div class="page-header">
+    <h1>Mosaic History</h1>
+    <p>Your past mosaic creations</p>
+</div>
+
+@if (_jobs.Count == 0)
+{
+    <div class="card" style="text-align:center; padding:60px;">
+        <h3 style="color:var(--muted);">No mosaics yet</h3>
+        <p style="color:var(--muted); font-size:14px; margin-top:4px;">Create your first mosaic in the Studio</p>
+        <a href="/studio" class="btn btn-primary" style="margin-top:16px;">Go to Studio</a>
+    </div>
+}
+else
+{
+    <table>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Style</th>
+                <th>Tile Size</th>
+                <th>Tiles</th>
+                <th>Duration</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var job in _jobs)
+            {
+                <tr>
+                    <td>
+                        <span class="badge badge-@job.Status.ToString().ToLower()">@job.Status</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-@job.Style.ToString().ToLower()">@job.Style</span>
+                    </td>
+                    <td>@(job.PxFormat.Size)px</td>
+                    <td>@job.CompletedTiles / @job.TotalTiles</td>
+                    <td>@(job.DurationMs.HasValue ? $"{job.DurationMs / 1000.0:F1}s" : "-")</td>
+                    <td>@job.CreatedAt.ToString("MMM dd, HH:mm")</td>
+                    <td>
+                        @if (job.Status == JobStatus.Completed)
+                        {
+                            <a href="/studio/@job.Id" class="btn btn-sm btn-primary">View</a>
+                        }
+                        else if (job.Status == JobStatus.Processing)
+                        {
+                            <a href="/studio/@job.Id" class="btn btn-sm btn-secondary">Track</a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<MosaicJob> _jobs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _jobs = await Db.MosaicJobs
+            .OrderByDescending(j => j.CreatedAt)
+            .Take(50)
+            .ToListAsync();
+    }
+}

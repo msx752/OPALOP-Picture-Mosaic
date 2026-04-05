@@ -1,0 +1,78 @@
+@page "/account"
+@inject OpalopDbContext Db
+
+<div class="page-header">
+    <h1>Account</h1>
+</div>
+
+<div class="grid grid-2">
+    <div class="card">
+        <h3 style="margin-bottom:16px;">Profile</h3>
+        @if (_user is not null)
+        {
+            <div class="form-group">
+                <label>Email</label>
+                <div style="padding:8px 0;">@_user.Email</div>
+            </div>
+            <div class="form-group">
+                <label>Display Name</label>
+                <div style="padding:8px 0;">@(_user.DisplayName ?? "-")</div>
+            </div>
+            <div class="form-group">
+                <label>Member Since</label>
+                <div style="padding:8px 0;">@_user.CreatedAt.ToString("MMMM dd, yyyy")</div>
+            </div>
+            <div class="form-group">
+                <label>Last Login</label>
+                <div style="padding:8px 0;">@(_user.LastLoginAt?.ToString("MMM dd, yyyy HH:mm") ?? "-")</div>
+            </div>
+        }
+    </div>
+    <div class="card">
+        <h3 style="margin-bottom:16px;">Usage</h3>
+        <div class="grid grid-2">
+            <div class="stat">
+                <div class="stat-value" style="color:var(--accent);">@_photoCount</div>
+                <div class="stat-label">Photos</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" style="color:var(--success);">@_mosaicCount</div>
+                <div class="stat-label">Mosaics</div>
+            </div>
+        </div>
+        @if (_user is not null)
+        {
+            <div style="margin-top:24px; padding-top:16px; border-top:1px solid var(--border);">
+                <div class="stat">
+                    <div class="stat-value" style="color:var(--warning);">@_user.TicketBalance</div>
+                    <div class="stat-label">Tickets Remaining</div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card" style="margin-top:24px;">
+    <h3 style="margin-bottom:8px;">Quick Links</h3>
+    <div style="display:flex; gap:12px;">
+        <a href="/photos" class="btn btn-secondary">Photo Library</a>
+        <a href="/studio" class="btn btn-primary">Create Mosaic</a>
+        <a href="/admin" class="btn btn-secondary">Admin Panel</a>
+    </div>
+</div>
+
+@code {
+    private User? _user;
+    private int _photoCount;
+    private int _mosaicCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _user = await Db.Users.FirstOrDefaultAsync();
+        if (_user is not null)
+        {
+            _photoCount = await Db.Photos.CountAsync(p => p.UserId == _user.Id && p.IsActive);
+            _mosaicCount = await Db.MosaicJobs.CountAsync(j => j.UserId == _user.Id && j.Status == JobStatus.Completed);
+        }
+    }
+}

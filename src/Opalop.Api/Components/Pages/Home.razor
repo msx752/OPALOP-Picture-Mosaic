@@ -1,0 +1,55 @@
+@page "/"
+@inject OpalopDbContext Db
+
+<div class="page-header">
+    <h1>Welcome to OPALOP Mosaic</h1>
+    <p>Create stunning photo mosaics from your image library</p>
+</div>
+
+<div class="grid grid-3" style="margin-bottom:32px;">
+    <div class="card stat">
+        <div class="stat-value">@_photoCount</div>
+        <div class="stat-label">Photos in Library</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-value">@_collectionCount</div>
+        <div class="stat-label">Collections</div>
+    </div>
+    <div class="card stat">
+        <div class="stat-value">@_mosaicCount</div>
+        <div class="stat-label">Mosaics Created</div>
+    </div>
+</div>
+
+<div class="grid grid-2">
+    <a href="/studio" class="card" style="text-decoration:none;">
+        <h3 style="color:var(--accent); margin-bottom:8px;">Create Mosaic</h3>
+        <p style="color:var(--muted); font-size:14px;">Upload a source image and generate a mosaic from your photo library</p>
+    </a>
+    <a href="/photos" class="card" style="text-decoration:none;">
+        <h3 style="color:var(--accent); margin-bottom:8px;">Photo Library</h3>
+        <p style="color:var(--muted); font-size:14px;">Upload and manage your tile photos (@_photoCount photos available)</p>
+    </a>
+    <a href="/collections" class="card" style="text-decoration:none;">
+        <h3 style="color:var(--accent); margin-bottom:8px;">Collections</h3>
+        <p style="color:var(--muted); font-size:14px;">Organize photos into themed collections for targeted mosaics</p>
+    </a>
+    <a href="/history" class="card" style="text-decoration:none;">
+        <h3 style="color:var(--accent); margin-bottom:8px;">History</h3>
+        <p style="color:var(--muted); font-size:14px;">View your past mosaic creations and download results</p>
+    </a>
+</div>
+
+@code {
+    private int _photoCount;
+    private int _collectionCount;
+    private int _mosaicCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // For now show global stats; will be per-user after auth
+        _photoCount = await Db.Photos.CountAsync(p => p.IsActive);
+        _collectionCount = await Db.PhotoCollections.CountAsync();
+        _mosaicCount = await Db.MosaicJobs.CountAsync(j => j.Status == JobStatus.Completed);
+    }
+}

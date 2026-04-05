@@ -1,0 +1,89 @@
+@page "/collections"
+@inject OpalopDbContext Db
+@rendermode InteractiveServer
+
+<div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+        <h1>Collections</h1>
+        <p>Organize photos into themed collections for targeted mosaics</p>
+    </div>
+    <button class="btn btn-primary" @onclick="() => _showCreate = true">+ New Collection</button>
+</div>
+
+@if (_showCreate)
+{
+    <div class="card" style="margin-bottom:24px;">
+        <h3 style="margin-bottom:12px;">Create Collection</h3>
+        <div class="form-group">
+            <label>Name</label>
+            <input class="form-input" @bind="_newName" placeholder="e.g. Travel Photos" />
+        </div>
+        <div class="form-group">
+            <label>Description (optional)</label>
+            <input class="form-input" @bind="_newDescription" placeholder="Photos from my travels" />
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" @onclick="CreateCollection" disabled="@string.IsNullOrWhiteSpace(_newName)">Create</button>
+            <button class="btn btn-secondary" @onclick="() => _showCreate = false">Cancel</button>
+        </div>
+    </div>
+}
+
+<div class="grid grid-3">
+    @foreach (var col in _collections)
+    {
+        <a href="/collections/@col.Id" class="card" style="text-decoration:none;">
+            <h3 style="color:var(--text); margin-bottom:4px;">@col.Name</h3>
+            @if (!string.IsNullOrEmpty(col.Description))
+            {
+                <p style="color:var(--muted); font-size:13px; margin-bottom:8px;">@col.Description</p>
+            }
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:var(--accent); font-size:14px;">@col.PhotoCount photos</span>
+                <span style="color:var(--muted); font-size:12px;">@col.CreatedAt.ToString("MMM dd, yyyy")</span>
+            </div>
+        </a>
+    }
+</div>
+
+@if (_collections.Count == 0 && !_showCreate)
+{
+    <div class="card" style="text-align:center; padding:60px;">
+        <h3 style="color:var(--muted);">No collections yet</h3>
+        <p style="color:var(--muted); font-size:14px; margin-top:4px;">Create a collection to organize your photos</p>
+        <button class="btn btn-primary" style="margin-top:16px;" @onclick="() => _showCreate = true">Create First Collection</button>
+    </div>
+}
+
+@code {
+    private List<CollectionView> _collections = [];
+    private bool _showCreate;
+    private string _newName = "";
+    private string _newDescription = "";
+
+    record CollectionView(Guid Id, string Name, string? Description, int PhotoCount, DateTime CreatedAt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCollections();
+    }
+
+    private async Task LoadCollections()
+    {
+        _collections = await Db.PhotoCollections
+            .OrderByDescending(c => c.CreatedAt)
+            .Select(c => new CollectionView(c.Id, c.Name, c.Description, c.Photos.Count(p => p.IsActive), c.CreatedAt))
+            .ToListAsync();
+    }
+
+    private async Task CreateCollection()
+    {
+        if (string.IsNullOrWhiteSpace(_newName)) return;
+        Db.PhotoCollections.Add(new PhotoCollection { Id = Guid.NewGuid(), Name = _newName, Description = _newDescription });
+        await Db.SaveChangesAsync();
+        _newName = "";
+        _newDescription = "";
+        _showCreate = false;
+        await LoadCollections();
+    }
+}

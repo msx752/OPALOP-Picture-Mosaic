@@ -58,7 +58,8 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddRazorComponents();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 var app = builder.Build();
 
@@ -68,8 +69,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
 
@@ -82,8 +85,7 @@ app.MapAdminEndpoints();
 app.MapImportEndpoints();
 app.MapHub<MosaicProgressHub>("/hubs/mosaic");
 
-app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
-
-app.MapRazorComponents<App>();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();

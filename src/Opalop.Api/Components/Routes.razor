@@ -2,9 +2,15 @@
 
 <Router AppAssembly="typeof(App).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AdminLayout)" />
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.UserLayout)" />
     </Found>
     <NotFound>
-        <p>Page not found</p>
+        <LayoutView Layout="typeof(Layout.UserLayout)">
+            <div class="card" style="text-align:center; padding:60px;">
+                <h2>404 - Page Not Found</h2>
+                <p style="color:var(--muted); margin-top:8px;">The page you're looking for doesn't exist.</p>
+                <a href="/" class="btn btn-primary" style="margin-top:16px;">Go Home</a>
+            </div>
+        </LayoutView>
     </NotFound>
 </Router>

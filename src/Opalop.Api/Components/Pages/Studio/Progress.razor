@@ -1,0 +1,108 @@
+@page "/studio/{JobId:guid}"
+@inject Opalop.Application.Interfaces.IJobTracker JobTracker
+@inject Opalop.Application.Interfaces.IPhotoStorage PhotoStorage
+@inject OpalopDbContext Db
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+
+<div class="page-header">
+    <h1>Mosaic Progress</h1>
+</div>
+
+<div class="card" style="text-align:center; padding:40px;">
+    @if (_status == "completed" && _resultUrl is not null)
+    {
+        <h2 style="color:var(--success); margin-bottom:16px;">Mosaic Complete!</h2>
+        <div class="result-container">
+            <img src="@_resultUrl" alt="Mosaic result" />
+        </div>
+        <div style="margin-top:16px; display:flex; gap:12px; justify-content:center;">
+            <a href="@_resultUrl" download class="btn btn-primary btn-lg">Download</a>
+            <a href="/studio" class="btn btn-secondary">Create Another</a>
+        </div>
+        @if (_durationMs > 0)
+        {
+            <p style="color:var(--muted); font-size:14px; margin-top:12px;">
+                Generated @_totalTiles tiles in @(_durationMs / 1000.0)s
+            </p>
+        }
+    }
+    else if (_status == "failed")
+    {
+        <h2 style="color:var(--error); margin-bottom:16px;">Generation Failed</h2>
+        <p style="color:var(--muted);">@_errorMessage</p>
+        <a href="/studio" class="btn btn-primary" style="margin-top:16px;">Try Again</a>
+    }
+    else
+    {
+        <h2 style="margin-bottom:24px;">Generating Mosaic...</h2>
+        <ProgressBar Value="@_progress" Label="@($"{_completed} / {_totalTiles} tiles ({_progress:F1}%)")" />
+        <div style="margin-top:16px;">
+            <span class="badge badge-processing">@_status</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid JobId { get; set; }
+
+    private string _status = "loading";
+    private int _completed;
+    private int _totalTiles;
+    private double _progress;
+    private string? _resultUrl;
+    private string? _errorMessage;
+    private long _durationMs;
+    private Timer? _pollTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckStatus();
+
+        if (_status is not "completed" and not "failed")
+        {
+            _pollTimer = new Timer(async _ =>
+            {
+                await CheckStatus();
+                await InvokeAsync(StateHasChanged);
+            }, null, 2000, 2000);
+        }
+    }
+
+    private async Task CheckStatus()
+    {
+        var info = await JobTracker.GetJobInfoAsync(JobId);
+        if (info is null) { _status = "not found"; return; }
+
+        _status = info.Status;
+        _completed = info.CompletedTiles;
+        _totalTiles = info.TotalTiles;
+        _progress = _totalTiles > 0 ? (double)_completed / _totalTiles * 100 : 0;
+
+        if (_status == "completed")
+        {
+            _pollTimer?.Dispose();
+            _pollTimer = null;
+
+            var job = await Db.MosaicJobs.FirstOrDefaultAsync(j => j.Id == JobId);
+            if (job?.ResultPath is not null)
+            {
+                _resultUrl = await PhotoStorage.GetPresignedUrlAsync("mosaics", job.ResultPath, 3600);
+                _durationMs = job.DurationMs ?? 0;
+            }
+        }
+        else if (_status == "failed")
+        {
+            _pollTimer?.Dispose();
+            _pollTimer = null;
+            var job = await Db.MosaicJobs.FirstOrDefaultAsync(j => j.Id == JobId);
+            _errorMessage = job?.ErrorMessage ?? "Unknown error";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_pollTimer is not null)
+            await _pollTimer.DisposeAsync();
+    }
+}

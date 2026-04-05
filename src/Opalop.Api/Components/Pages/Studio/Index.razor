@@ -1,0 +1,184 @@
+@page "/studio"
+@inject OpalopDbContext Db
+@inject NavigationManager Nav
+@inject Opalop.Application.Interfaces.IPhotoStorage PhotoStorage
+@inject Opalop.Api.Services.MosaicOrchestrator Orchestrator
+@rendermode InteractiveServer
+
+<div class="page-header">
+    <h1>Mosaic Studio</h1>
+    <p>Create a new photo mosaic</p>
+</div>
+
+<div class="wizard-steps">
+    <div class="wizard-step @(_step >= 1 ? "active" : "") @(_step > 1 ? "done" : "")">1. Source Image</div>
+    <div class="wizard-step @(_step >= 2 ? "active" : "") @(_step > 2 ? "done" : "")">2. Configure</div>
+    <div class="wizard-step @(_step >= 3 ? "active" : "")">3. Generate</div>
+</div>
+
+@if (_step == 1)
+{
+    <div class="card">
+        <h3 style="margin-bottom:16px;">Select Source Image</h3>
+        @if (_resources.Count > 0)
+        {
+            <div class="grid grid-3" style="margin-bottom:16px;">
+                @foreach (var res in _resources)
+                {
+                    <div class="card @(_selectedResourceId == res.Id ? "selected-card" : "")"
+                         style="cursor:pointer; @(_selectedResourceId == res.Id ? "border-color:var(--accent);" : "")"
+                         @onclick="() => _selectedResourceId = res.Id">
+                        <div style="font-size:14px; font-weight:500;">@res.Filename</div>
+                        <div style="font-size:12px; color:var(--muted);">@(res.Width)x@(res.Height) &mdash; @((res.FileSizeBytes / 1024))KB</div>
+                    </div>
+                }
+            </div>
+        }
+        <p style="color:var(--muted); font-size:14px; margin-bottom:12px;">Or upload a new source image (max 12MB):</p>
+        <InputFile OnChange="HandleResourceUpload" accept="image/*" />
+        @if (_uploadError is not null)
+        {
+            <p style="color:var(--error); font-size:14px; margin-top:8px;">@_uploadError</p>
+        }
+        <div style="margin-top:16px;">
+            <button class="btn btn-primary" disabled="@(_selectedResourceId == Guid.Empty)" @onclick="() => _step = 2">Next</button>
+        </div>
+    </div>
+}
+else if (_step == 2)
+{
+    <div class="card">
+        <h3 style="margin-bottom:16px;">Mosaic Settings</h3>
+
+        <div class="form-group">
+            <label>Style</label>
+            <div class="style-selector">
+                <div class="style-option @(_style == "overlay" ? "selected" : "")" @onclick='() => _style = "overlay"'>
+                    <h3>Overlay</h3>
+                    <p>Semi-transparent tiles on original photo</p>
+                </div>
+                <div class="style-option @(_style == "classic" ? "selected" : "")" @onclick='() => _style = "classic"'>
+                    <h3>Classic</h3>
+                    <p>Fully opaque tiles, pure photomosaic</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Tile Size</label>
+            <div class="tile-sizes">
+                @foreach (var size in _tileSizes)
+                {
+                    <div class="tile-size-btn @(_tileSize == size ? "selected" : "")" @onclick="() => _tileSize = size">
+                        @(size)px
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (_style == "overlay")
+        {
+            <div class="form-group">
+                <label>Opacity (@_opacity)</label>
+                <div class="slider-group">
+                    <input type="range" min="50" max="230" @bind="_opacity" @bind:event="oninput" />
+                    <span class="slider-value">@((int)(_opacity / 255.0 * 100))%</span>
+                </div>
+            </div>
+        }
+
+        <div class="form-group">
+            <label>Collection (optional)</label>
+            <select class="form-select" @bind="_selectedCollectionId">
+                <option value="">All photos</option>
+                @foreach (var col in _collections)
+                {
+                    <option value="@col.Id">@col.Name (@col.PhotoCount photos)</option>
+                }
+            </select>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:16px;">
+            <button class="btn btn-secondary" @onclick="() => _step = 1">Back</button>
+            <button class="btn btn-primary btn-lg" @onclick="Generate" disabled="@_generating">
+                @if (_generating) { <span>Generating...</span> } else { <span>Generate Mosaic</span> }
+            </button>
+        </div>
+    </div>
+}
+
+@if (_error is not null)
+{
+    <div class="card" style="border-color:var(--error); margin-top:16px;">
+        <p style="color:var(--error);">@_error</p>
+    </div>
+}
+
+@code {
+    private int _step = 1;
+    private List<Resource> _resources = [];
+    private List<CollectionView> _collections = [];
+    private Guid _selectedResourceId;
+    private string _style = "overlay";
+    private int _tileSize = 94;
+    private int _opacity = 153;
+    private string _selectedCollectionId = "";
+    private bool _generating;
+    private string? _error;
+    private string? _uploadError;
+    private static readonly int[] _tileSizes = [12, 20, 36, 48, 64, 94];
+
+    record CollectionView(Guid Id, string Name, int PhotoCount);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _resources = await Db.Resources.OrderByDescending(r => r.UploadedAt).ToListAsync();
+        _collections = await Db.PhotoCollections
+            .Select(c => new CollectionView(c.Id, c.Name, c.Photos.Count(p => p.IsActive)))
+            .ToListAsync();
+    }
+
+    private async Task HandleResourceUpload(InputFileChangeEventArgs e)
+    {
+        _uploadError = null;
+        var file = e.File;
+        if (file.Size > 12 * 1024 * 1024)
+        {
+            _uploadError = "File exceeds 12MB limit.";
+            return;
+        }
+        // Resource upload requires API call — for now show message
+        _uploadError = "Use the API endpoint POST /api/resources/upload for now. Resource upload via UI coming soon.";
+    }
+
+    private async Task Generate()
+    {
+        _generating = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            // Find first userId from resources (simplified — will use auth later)
+            var resource = await Db.Resources.FindAsync(_selectedResourceId);
+            if (resource is null) { _error = "Resource not found."; return; }
+
+            var style = _style == "classic" ? MosaicStyle.Classic : MosaicStyle.Overlay;
+            Guid? collectionId = string.IsNullOrEmpty(_selectedCollectionId) ? null : Guid.Parse(_selectedCollectionId);
+
+            var jobId = await Orchestrator.GenerateAsync(
+                resource.UserId, _selectedResourceId, _tileSize,
+                (byte)_opacity, style, collectionId);
+
+            Nav.NavigateTo($"/studio/{jobId}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _generating = false;
+        }
+    }
+}

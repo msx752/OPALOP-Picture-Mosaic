@@ -1,0 +1,39 @@
+@inherits LayoutComponentBase
+@inject OpalopDbContext Db
+
+<div class="user-layout">
+    <nav class="topnav">
+        <div class="topnav-inner container">
+            <a href="/" class="topnav-brand">OPALOP Mosaic</a>
+            <div class="topnav-links">
+                <a href="/photos">Photos</a>
+                <a href="/collections">Collections</a>
+                <a href="/studio">Studio</a>
+                <a href="/history">History</a>
+            </div>
+            <div class="topnav-right">
+                <a href="/account" class="topnav-user">Account</a>
+            </div>
+        </div>
+    </nav>
+    <main class="container" style="padding-top: 24px; padding-bottom: 48px;">
+        @Body
+    </main>
+</div>
+
+<style>
+    .user-layout { min-height: 100vh; }
+    .topnav { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+    .topnav-inner { display: flex; align-items: center; height: 56px; gap: 32px; }
+    .topnav-brand { font-size: 18px; font-weight: 700; color: var(--accent); }
+    .topnav-links { display: flex; gap: 16px; }
+    .topnav-links a { color: var(--muted); font-size: 14px; padding: 4px 8px; border-radius: 4px; }
+    .topnav-links a:hover { color: var(--text); background: var(--surface-hover); }
+    .topnav-right { margin-left: auto; }
+    .topnav-user { color: var(--muted); font-size: 14px; }
+
+    @@media (max-width: 640px) {
+        .topnav-inner { gap: 12px; }
+        .topnav-links a { font-size: 12px; padding: 4px; }
+    }
+</style>

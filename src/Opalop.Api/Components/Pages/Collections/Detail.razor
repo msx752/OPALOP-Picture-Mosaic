@@ -1,0 +1,73 @@
+@page "/collections/{Id:guid}"
+@inject OpalopDbContext Db
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+@if (_collection is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="page-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h1>@_collection.Name</h1>
+            <p>@(_collection.Description ?? "No description") &mdash; @_photos.Count photos</p>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <a href="/studio?collectionId=@Id" class="btn btn-primary">Create Mosaic</a>
+            <button class="btn btn-danger btn-sm" @onclick="DeleteCollection">Delete</button>
+        </div>
+    </div>
+
+    <div class="photo-grid">
+        @foreach (var photo in _photos)
+        {
+            <div class="photo-thumb">
+                <img src="/api/placeholder.svg" alt="@photo.Filename" loading="lazy" />
+                <div class="photo-thumb-overlay">
+                    <button class="btn btn-danger btn-sm" @onclick="() => RemovePhoto(photo.Id)">Remove</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (_photos.Count == 0)
+    {
+        <div class="card" style="text-align:center; padding:40px;">
+            <p style="color:var(--muted);">No photos in this collection. Add photos from the <a href="/photos">Photo Library</a>.</p>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PhotoCollection? _collection;
+    private List<Photo> _photos = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _collection = await Db.PhotoCollections.FirstOrDefaultAsync(c => c.Id == Id);
+        if (_collection is null) return;
+        _photos = await Db.Photos
+            .Where(p => p.CollectionId == Id && p.IsActive)
+            .OrderByDescending(p => p.UploadedAt)
+            .ToListAsync();
+    }
+
+    private async Task RemovePhoto(Guid photoId)
+    {
+        await Db.Photos.Where(p => p.Id == photoId && p.CollectionId == Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.CollectionId, (Guid?)null));
+        _photos.RemoveAll(p => p.Id == photoId);
+    }
+
+    private async Task DeleteCollection()
+    {
+        await Db.Photos.Where(p => p.CollectionId == Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.CollectionId, (Guid?)null));
+        Db.PhotoCollections.Remove(_collection!);
+        await Db.SaveChangesAsync();
+        Nav.NavigateTo("/collections");
+    }
+}
