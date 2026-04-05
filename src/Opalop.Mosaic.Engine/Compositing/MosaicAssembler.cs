@@ -10,21 +10,27 @@ public record ProcessedTile(int X, int Y, SKBitmap Bitmap) : IDisposable
 public static class MosaicAssembler
 {
     /// <summary>
-    /// Assembles the mosaic by drawing tiles on top of the original source image
-    /// with configurable opacity, so the original photo shows through.
-    /// The source image is resized to match the upscaled canvas dimensions.
+    /// Assembles the mosaic using legacy premultiplied-alpha compositing:
+    /// 1. Source image is resized to match the upscaled tile grid
+    /// 2. Each tile gets legacy transparency (both RGB + Alpha scaled by opacity%)
+    /// 3. Tiles are drawn on top of the source image
+    /// This matches the original GDI+ Transparnt() + DrawImage behavior.
     /// </summary>
     public static SKBitmap Assemble(IReadOnlyList<ProcessedTile> tiles,
         SKBitmap sourceImage, int canvasWidth, int canvasHeight, byte opacity)
     {
-        // Resize source image to match the upscaled tile grid dimensions
         var result = sourceImage.Resize(new SKImageInfo(canvasWidth, canvasHeight), SKSamplingOptions.Default)
                      ?? sourceImage.Copy();
         using var canvas = new SKCanvas(result);
-        using var paint = new SKPaint { Color = new SKColor(255, 255, 255, opacity) };
+
+        // Legacy opacity is 0-100 percent; convert from 0-255 byte
+        int opacityPercent = (int)Math.Round(opacity / 255.0 * 100);
 
         foreach (var tile in tiles)
-            canvas.DrawBitmap(tile.Bitmap, tile.X, tile.Y, paint);
+        {
+            using var transparentTile = TileCompositor.ApplyLegacyTransparency(tile.Bitmap, opacityPercent);
+            canvas.DrawBitmap(transparentTile, tile.X, tile.Y);
+        }
 
         return result;
     }

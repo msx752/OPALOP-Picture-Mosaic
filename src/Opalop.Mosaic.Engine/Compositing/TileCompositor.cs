@@ -22,4 +22,33 @@ public static class TileCompositor
         surface.DrawBitmap(tile, x, y, paint);
         surface.Restore();
     }
+
+    /// <summary>
+    /// Applies legacy premultiplied-alpha transparency to a tile bitmap.
+    /// Scales both Alpha AND RGB channels by opacity/100, matching the original
+    /// GDI+ Transparnt() behavior which dims colors alongside transparency.
+    /// </summary>
+    public static SKBitmap ApplyLegacyTransparency(SKBitmap source, int opacityPercent)
+    {
+        var result = new SKBitmap(source.Width, source.Height);
+        float factor = opacityPercent / 100f;
+
+        for (int x = 0; x < source.Width; x++)
+        {
+            for (int y = 0; y < source.Height; y++)
+            {
+                var c = source.GetPixel(x, y);
+                if (c.Alpha == 0) continue;
+
+                var newColor = new SKColor(
+                    (byte)(c.Red * factor),
+                    (byte)(c.Green * factor),
+                    (byte)(c.Blue * factor),
+                    (byte)(c.Alpha * factor));
+                result.SetPixel(x, y, newColor);
+            }
+        }
+
+        return result;
+    }
 }
