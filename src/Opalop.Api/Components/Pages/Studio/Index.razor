@@ -28,6 +28,8 @@
                     <div class="card @(_selectedResourceId == res.Id ? "selected-card" : "")"
                          style="cursor:pointer; @(_selectedResourceId == res.Id ? "border-color:var(--accent);" : "")"
                          @onclick="() => _selectedResourceId = res.Id">
+                        <img src="/api/resources/@(res.Id)/image" alt="@res.Filename"
+                             style="width:100%; max-height:160px; object-fit:cover; border-radius:4px; margin-bottom:8px;" loading="lazy" />
                         <div style="font-size:14px; font-weight:500;">@res.Filename</div>
                         <div style="font-size:12px; color:var(--muted);">@(res.Width)x@(res.Height) &mdash; @((res.FileSizeBytes / 1024))KB</div>
                     </div>

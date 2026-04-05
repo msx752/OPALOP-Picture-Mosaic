@@ -18,6 +18,22 @@ public static class ResourceEndpoints
 
         group.MapPost("/upload", UploadAsync).DisableAntiforgery();
         group.MapGet("/", ListAsync);
+        group.MapGet("/{id}/image", GetImageAsync).AllowAnonymous();
+    }
+
+    private static async Task<IResult> GetImageAsync(
+        Guid id,
+        OpalopDbContext db,
+        IPhotoStorage photoStorage,
+        CancellationToken ct)
+    {
+        var resource = await db.Resources.FirstOrDefaultAsync(r => r.Id == id, ct);
+        if (resource is null)
+            return Results.NotFound();
+
+        var stream = await photoStorage.DownloadAsync(ResourceBucket, resource.StoragePath, ct);
+        var contentType = resource.StoragePath.EndsWith(".png") ? "image/png" : "image/jpeg";
+        return Results.Stream(stream, contentType);
     }
 
     private static async Task<IResult> UploadAsync(
