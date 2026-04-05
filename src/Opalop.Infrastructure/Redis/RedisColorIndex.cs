@@ -9,11 +9,15 @@ public class RedisColorIndex : IColorIndex
     private readonly RedisConnectionManager _connectionManager;
 
     /// <summary>
-    /// Lua script that atomically checks usage count and increments it if under the limit.
-    /// KEYS[1] = usage hash key (job:{jobId}:usage)
+    /// Lua script that atomically checks usage count, spatial distance, and increments if allowed.
+    /// KEYS[1] = usage count hash (job:{jobId}:usage)
+    /// KEYS[2] = spatial positions hash (job:{jobId}:positions:{photoId})
     /// ARGV[1] = photoId string
     /// ARGV[2] = max usage per photo
-    /// Returns 1 if usage was claimed (incremented), 0 if limit reached.
+    /// ARGV[3] = current tile row
+    /// ARGV[4] = current tile col
+    /// ARGV[5] = minimum Manhattan distance
+    /// Returns 1 if usage was claimed, 0 if rejected (usage limit or too close).
     /// </summary>
     private const string ClaimUsageLuaScript = @"
 local current = tonumber(redis.call('HGET', KEYS[1], ARGV[1])) or 0
@@ -21,7 +25,25 @@ local maxUsage = tonumber(ARGV[2])
 if current >= maxUsage then
     return 0
 end
+local tileRow = tonumber(ARGV[3])
+local tileCol = tonumber(ARGV[4])
+local minDist = tonumber(ARGV[5])
+if minDist > 0 and tileRow >= 0 then
+    local positions = redis.call('LRANGE', KEYS[2], 0, -1)
+    for i = 1, #positions, 2 do
+        local pr = tonumber(positions[i])
+        local pc = tonumber(positions[i+1])
+        local dist = math.abs(tileRow - pr) + math.abs(tileCol - pc)
+        if dist < minDist then
+            return 0
+        end
+    end
+end
 redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+if tileRow >= 0 then
+    redis.call('RPUSH', KEYS[2], tileRow, tileCol)
+    redis.call('EXPIRE', KEYS[2], 3600)
+end
 return 1
 ";
 
@@ -68,7 +90,8 @@ return 1
 
     public async Task<ColorMatchResult?> FindBestMatchAsync(
         Guid userId, ColorFingerprint target, Guid jobId,
-        int maxUsagePerPhoto = 5, CancellationToken ct = default)
+        int maxUsagePerPhoto = 5, int tileRow = -1, int tileCol = -1, int minDistance = 3,
+        CancellationToken ct = default)
     {
         var db = _connectionManager.GetDatabase();
         var sortedSetKey = SortedSetKey(userId);
@@ -97,10 +120,8 @@ return 1
                 fingerprintTasks[i] = (photoIdStr, db.HashGetAllAsync(hashKey));
             }
 
-            // Evaluate candidates by weighted ΔE, pick best match
-            float bestDeltaE = float.MaxValue;
-            string? bestPhotoIdStr = null;
-            ColorFingerprint bestFingerprint = default;
+            // Two-pass ranking: CIE76 coarse filter → CIEDE2000 precise ranking
+            var allCandidates = new List<(string PhotoIdStr, float DeltaE76, ColorFingerprint Fp)>();
 
             foreach (var (photoIdStr, hashTask) in fingerprintTasks)
             {
@@ -109,11 +130,22 @@ return 1
                     continue;
 
                 var fp = HashEntriesToFingerprint(entries);
-                var deltaE = target.WeightedDeltaE(fp);
+                var deltaE76 = target.WeightedDeltaE(fp);
+                allCandidates.Add((photoIdStr, deltaE76, fp));
+            }
 
-                if (deltaE < bestDeltaE)
+            // Rank top candidates by CIEDE2000 for perceptually accurate final selection
+            var topN = allCandidates.OrderBy(c => c.DeltaE76).Take(10).ToList();
+            float bestDeltaE = float.MaxValue;
+            string? bestPhotoIdStr = null;
+            ColorFingerprint bestFingerprint = default;
+
+            foreach (var (photoIdStr, _, fp) in topN)
+            {
+                var deltaE2000 = target.WeightedDeltaE2000(fp);
+                if (deltaE2000 < bestDeltaE)
                 {
-                    bestDeltaE = deltaE;
+                    bestDeltaE = deltaE2000;
                     bestPhotoIdStr = photoIdStr;
                     bestFingerprint = fp;
                 }
@@ -122,11 +154,12 @@ return 1
             if (bestPhotoIdStr is null)
                 continue;
 
-            // Try to claim usage atomically via Lua script
+            // Try to claim usage atomically via Lua script (with spatial guard)
+            var positionsKey = PositionsKey(jobId, bestPhotoIdStr);
             var claimed = (int)await db.ScriptEvaluateAsync(
                 ClaimUsageLuaScript,
-                new RedisKey[] { usageKey },
-                new RedisValue[] { bestPhotoIdStr, maxUsagePerPhoto });
+                new RedisKey[] { usageKey, positionsKey },
+                new RedisValue[] { bestPhotoIdStr, maxUsagePerPhoto, tileRow, tileCol, minDistance });
 
             if (claimed == 1)
             {
@@ -136,30 +169,20 @@ return 1
                     bestFingerprint);
             }
 
-            // If best match is exhausted, try remaining candidates in ΔE order
-            var sortedCandidates = new List<(string PhotoIdStr, float DeltaE, ColorFingerprint Fp)>();
-            foreach (var (photoIdStr, hashTask) in fingerprintTasks)
-            {
-                if (photoIdStr == bestPhotoIdStr)
-                    continue;
-
-                var entries = await hashTask;
-                if (entries.Length == 0)
-                    continue;
-
-                var fp = HashEntriesToFingerprint(entries);
-                var deltaE = target.WeightedDeltaE(fp);
-                sortedCandidates.Add((photoIdStr, deltaE, fp));
-            }
-
-            sortedCandidates.Sort((a, b) => a.DeltaE.CompareTo(b.DeltaE));
+            // If best match is exhausted, try remaining candidates ranked by CIEDE2000
+            var sortedCandidates = allCandidates
+                .Where(c => c.PhotoIdStr != bestPhotoIdStr)
+                .Select(c => (c.PhotoIdStr, DeltaE: target.WeightedDeltaE2000(c.Fp), c.Fp))
+                .OrderBy(c => c.DeltaE)
+                .ToList();
 
             foreach (var (photoIdStr, deltaE, fp) in sortedCandidates)
             {
+                var altPositionsKey = PositionsKey(jobId, photoIdStr);
                 var claimedAlt = (int)await db.ScriptEvaluateAsync(
                     ClaimUsageLuaScript,
-                    new RedisKey[] { usageKey },
-                    new RedisValue[] { photoIdStr, maxUsagePerPhoto });
+                    new RedisKey[] { usageKey, altPositionsKey },
+                    new RedisValue[] { photoIdStr, maxUsagePerPhoto, tileRow, tileCol, minDistance });
 
                 if (claimedAlt == 1)
                 {
@@ -213,6 +236,7 @@ return 1
     private static string PhotoHashKey(Guid userId, Guid photoId) => $"user:{userId}:photo:{photoId}";
     private static string PhotoHashKey(Guid userId, string photoIdStr) => $"user:{userId}:photo:{photoIdStr}";
     private static string UsageKey(Guid jobId) => $"job:{jobId}:usage";
+    private static string PositionsKey(Guid jobId, string photoIdStr) => $"job:{jobId}:pos:{photoIdStr}";
 
     private static HashEntry[] FingerprintToHashEntries(ColorFingerprint fp) =>
     [

@@ -96,8 +96,13 @@ public sealed class TileProcessorService(
     private async Task<SKBitmap> CreateTileBitmapAsync(
         TileTask tile, JobInfo jobInfo, int pxFormat, CancellationToken ct)
     {
+        int tileRow = pxFormat > 0 ? tile.Y / pxFormat : -1;
+        int tileCol = pxFormat > 0 ? tile.X / pxFormat : -1;
+
         var match = await colorIndex.FindBestMatchAsync(
-            jobInfo.UserId, tile.Fingerprint, tile.JobId, maxUsagePerPhoto: 5, ct);
+            jobInfo.UserId, tile.Fingerprint, tile.JobId,
+            maxUsagePerPhoto: 5, tileRow: tileRow, tileCol: tileCol,
+            minDistance: 3, ct: ct);
 
         if (match is not null)
         {

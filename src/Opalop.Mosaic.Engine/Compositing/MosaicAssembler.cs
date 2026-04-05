@@ -23,12 +23,16 @@ public static class MosaicAssembler
                      ?? sourceImage.Copy();
         using var canvas = new SKCanvas(result);
 
-        // Legacy opacity is 0-100 percent; convert from 0-255 byte
-        int opacityPercent = (int)Math.Round(opacity / 255.0 * 100);
+        int baseOpacityPercent = (int)Math.Round(opacity / 255.0 * 100);
+        var sourceSpan = result.GetPixelSpan();
 
         foreach (var tile in tiles)
         {
-            using var transparentTile = TileCompositor.ApplyLegacyTransparency(tile.Bitmap, opacityPercent);
+            // Luminance-adaptive opacity: sample source region's average brightness
+            int adaptiveOpacity = CalculateAdaptiveOpacity(sourceSpan, result.Width,
+                tile.X, tile.Y, tile.Bitmap.Width, tile.Bitmap.Height, baseOpacityPercent);
+
+            using var transparentTile = TileCompositor.ApplyLegacyTransparency(tile.Bitmap, adaptiveOpacity);
             canvas.DrawBitmap(transparentTile, tile.X, tile.Y);
         }
 
@@ -49,6 +53,29 @@ public static class MosaicAssembler
             canvas.DrawBitmap(tile.Bitmap, tile.X, tile.Y);
 
         return result;
+    }
+
+    /// <summary>
+    /// Calculates per-tile opacity based on source region luminance.
+    /// Dark regions → higher opacity (tiles more visible).
+    /// Bright regions → lower opacity (original more visible).
+    /// </summary>
+    private static int CalculateAdaptiveOpacity(ReadOnlySpan<byte> sourcePixels, int stride,
+        int tileX, int tileY, int tileW, int tileH, int baseOpacity)
+    {
+        // Sample center pixel of tile region for speed (full average is expensive)
+        int cx = tileX + tileW / 2;
+        int cy = tileY + tileH / 2;
+        int idx = (cy * stride + cx) * 4; // BGRA
+
+        if (idx + 2 >= sourcePixels.Length) return baseOpacity;
+
+        // Approximate luminance from RGB (BT.709)
+        float luminance = (sourcePixels[idx + 2] * 0.2126f + sourcePixels[idx + 1] * 0.7152f + sourcePixels[idx] * 0.0722f) / 255f;
+
+        // Dark (L≈0) → opacity * 1.3, Bright (L≈1) → opacity * 0.7
+        float factor = 1.3f - 0.6f * luminance;
+        return Math.Clamp((int)(baseOpacity * factor), 10, 95);
     }
 
     /// <summary>

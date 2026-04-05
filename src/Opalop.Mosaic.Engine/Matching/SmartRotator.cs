@@ -6,45 +6,44 @@ public enum RotationAngle { None = 0, Rotate90 = 90, Rotate180 = 180, Rotate270 
 
 public static class SmartRotator
 {
+    private static readonly RotationAngle[] AllRotations =
+        [RotationAngle.None, RotationAngle.Rotate90, RotationAngle.Rotate180, RotationAngle.Rotate270];
+
+    /// <summary>
+    /// Evaluates all 4 rotation angles and picks the one with the lowest total
+    /// WeightedDeltaE. This guarantees rotation never degrades the match quality.
+    /// </summary>
     public static RotationAngle DetermineRotation(ColorFingerprint target, ColorFingerprint candidate)
     {
-        var targetQuadrants = new (QuadrantLab Lab, int Position)[]
+        var bestRotation = RotationAngle.None;
+        float bestScore = float.MaxValue;
+
+        foreach (var rotation in AllRotations)
         {
-            (target.TopLeft, 0), (target.TopRight, 1),
-            (target.BottomLeft, 2), (target.BottomRight, 3)
-        };
+            var rotated = RotateFingerprint(candidate, rotation);
+            var score = target.WeightedDeltaE(rotated);
 
-        // Find target's most distinctive quadrant (farthest from total average)
-        var mostDistinctive = targetQuadrants
-            .OrderByDescending(q => q.Lab.DeltaE(target.Total))
-            .First();
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestRotation = rotation;
+            }
+        }
 
-        var candidateQuadrants = new (QuadrantLab Lab, int Position)[]
-        {
-            (candidate.TopLeft, 0), (candidate.TopRight, 1),
-            (candidate.BottomLeft, 2), (candidate.BottomRight, 3)
-        };
-
-        // Find candidate quadrant closest to target's distinctive quadrant
-        var bestMatch = candidateQuadrants
-            .OrderBy(q => q.Lab.DeltaE(mostDistinctive.Lab))
-            .First();
-
-        return GetRotation(bestMatch.Position, mostDistinctive.Position);
+        return bestRotation;
     }
 
-    // Rotation lookup: [from][to] -> angle needed
-    // Positions: 0=TL, 1=TR, 2=BL, 3=BR
-    // 90 deg CW: TL->TR, TR->BR, BR->BL, BL->TL
-    private static RotationAngle GetRotation(int from, int to)
+    /// <summary>
+    /// Returns a new fingerprint with quadrants permuted to match the given rotation.
+    /// </summary>
+    private static ColorFingerprint RotateFingerprint(ColorFingerprint fp, RotationAngle rotation) => rotation switch
     {
-        int[,] table =
-        {
-            { 0, 90, 270, 180 },    // from TL
-            { 270, 0, 180, 90 },    // from TR
-            { 90, 180, 0, 270 },    // from BL
-            { 180, 270, 90, 0 }     // from BR
-        };
-        return (RotationAngle)table[from, to];
-    }
+        // TL TR     BR BL (90° CW)     BR BL (180°)     TR TL (270° CW)
+        // BL BR  →  TR TL              TR TL          →  BL BR
+        RotationAngle.None => fp,
+        RotationAngle.Rotate90 => new ColorFingerprint(fp.Total, fp.BottomLeft, fp.TopLeft, fp.BottomRight, fp.TopRight),
+        RotationAngle.Rotate180 => new ColorFingerprint(fp.Total, fp.BottomRight, fp.BottomLeft, fp.TopRight, fp.TopLeft),
+        RotationAngle.Rotate270 => new ColorFingerprint(fp.Total, fp.TopRight, fp.BottomRight, fp.TopLeft, fp.BottomLeft),
+        _ => fp
+    };
 }

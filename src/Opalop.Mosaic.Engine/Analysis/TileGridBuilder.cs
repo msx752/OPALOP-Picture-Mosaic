@@ -57,8 +57,8 @@ public static class TileGridBuilder
     public static GridDimensions CalculateDimensions(int sourceWidth, int sourceHeight,
         int tileSize, int upscalePercent = DefaultUpscalePercent)
     {
-        int w = sourceWidth + (sourceWidth / 100) * upscalePercent;
-        int h = sourceHeight + (sourceHeight / 100) * upscalePercent;
+        int w = sourceWidth + (int)(sourceWidth * upscalePercent / 100.0);
+        int h = sourceHeight + (int)(sourceHeight * upscalePercent / 100.0);
         int alignedW = w - (w % tileSize);
         int alignedH = h - (h % tileSize);
         return new GridDimensions(alignedW, alignedH);
@@ -79,8 +79,8 @@ public static class TileGridBuilder
                    ?? source.Copy();
         }
 
-        int w = source.Width + (source.Width / 100) * upscalePercent;
-        int h = source.Height + (source.Height / 100) * upscalePercent;
+        int w = source.Width + (int)(source.Width * upscalePercent / 100.0);
+        int h = source.Height + (int)(source.Height * upscalePercent / 100.0);
         int newW = w - (w % tileSize);
         int newH = h - (h % tileSize);
 
