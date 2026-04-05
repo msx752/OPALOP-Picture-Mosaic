@@ -32,7 +32,11 @@ public static class MosaicEndpoints
 
         try
         {
-            var jobId = await orchestrator.GenerateAsync(userId, request.ResourceId, request.PxFormat, request.Opacity, ct);
+            var style = request.Style?.ToLowerInvariant() == "classic"
+                ? Opalop.Domain.Enums.MosaicStyle.Classic
+                : Opalop.Domain.Enums.MosaicStyle.Overlay;
+            var jobId = await orchestrator.GenerateAsync(userId, request.ResourceId, request.PxFormat,
+                request.Opacity, style, request.CollectionId, ct);
             return Results.Accepted($"/api/mosaic/{jobId}/status", new { jobId });
         }
         catch (InvalidOperationException ex)
@@ -123,4 +127,4 @@ public static class MosaicEndpoints
     }
 }
 
-public record GenerateRequest(Guid ResourceId, int PxFormat, byte? Opacity = null);
+public record GenerateRequest(Guid ResourceId, int PxFormat, byte? Opacity = null, string Style = "overlay", Guid? CollectionId = null);

@@ -18,7 +18,8 @@ public class MosaicOrchestrator(
 {
     private const string ResourceBucket = "resources";
 
-    public async Task<Guid> GenerateAsync(Guid userId, Guid resourceId, int pxFormat, byte? opacity, CancellationToken ct)
+    public async Task<Guid> GenerateAsync(Guid userId, Guid resourceId, int pxFormat,
+        byte? opacity, MosaicStyle style = MosaicStyle.Overlay, Guid? collectionId = null, CancellationToken ct = default)
     {
         if (!await jobTracker.TryAcquireLockAsync(userId, TimeSpan.FromMinutes(10), ct))
             throw new InvalidOperationException("A mosaic generation job is already running for this user.");
@@ -37,8 +38,9 @@ public class MosaicOrchestrator(
 
             var pixFmt = PixFormat.From(pxFormat);
             var tiles = TileGridBuilder.Build(sourceBitmap, pixFmt.Size);
-            var resolvedOpacity = opacity
-                ?? Mosaic.Engine.Compositing.MosaicAssembler.GetDefaultOpacity(pxFormat);
+            var resolvedOpacity = style == MosaicStyle.Classic
+                ? (byte)255
+                : opacity ?? Mosaic.Engine.Compositing.MosaicAssembler.GetDefaultOpacity(pxFormat);
 
             var jobId = Guid.NewGuid();
             var job = new MosaicJob
@@ -48,6 +50,7 @@ public class MosaicOrchestrator(
                 ResourceId = resourceId,
                 PxFormat = pixFmt,
                 Opacity = resolvedOpacity,
+                Style = style,
                 TotalTiles = tiles.Count,
                 Status = JobStatus.Queued
             };
@@ -55,7 +58,7 @@ public class MosaicOrchestrator(
             db.MosaicJobs.Add(job);
             await db.SaveChangesAsync(ct);
 
-            await jobTracker.InitJobAsync(jobId, tiles.Count, userId, pxFormat, resolvedOpacity, ct);
+            await jobTracker.InitJobAsync(jobId, tiles.Count, userId, pxFormat, resolvedOpacity, (int)style, collectionId, ct);
 
             var tileTasks = tiles.Select(t => new TileTask(
                 MessageId: string.Empty,

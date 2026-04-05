@@ -144,7 +144,7 @@ public static class PhotoEndpoints
         db.Photos.Add(photo);
         await db.SaveChangesAsync(ct);
 
-        await colorIndex.AddPhotoAsync(userId, photoId, fingerprint, ct);
+        await colorIndex.AddPhotoAsync(userId, photoId, fingerprint, ct: ct);
 
         // Generate augmented variants (brightness ±15%, horizontal flip) to expand color library
         var variants = PhotoAugmenter.Generate(resized);
@@ -178,7 +178,7 @@ public static class PhotoEndpoints
                              variantFingerprint.BottomLeft, variantFingerprint.BottomRight]
             };
             db.Photos.Add(variantPhoto);
-            await colorIndex.AddPhotoAsync(userId, variantId, variantFingerprint, ct);
+            await colorIndex.AddPhotoAsync(userId, variantId, variantFingerprint, ct: ct);
             variant.Bitmap.Dispose();
         }
         await db.SaveChangesAsync(ct);

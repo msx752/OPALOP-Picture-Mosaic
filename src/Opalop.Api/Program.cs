@@ -75,6 +75,7 @@ app.MapHealthChecks("/health");
 
 app.MapPhotoEndpoints();
 app.MapResourceEndpoints();
+app.MapCollectionEndpoints();
 app.MapMosaicEndpoints();
 app.MapAccountEndpoints();
 app.MapAdminEndpoints();

@@ -52,7 +52,7 @@ return 1
         _connectionManager = connectionManager;
     }
 
-    public async Task AddPhotoAsync(Guid userId, Guid photoId, ColorFingerprint fingerprint, CancellationToken ct = default)
+    public async Task AddPhotoAsync(Guid userId, Guid photoId, ColorFingerprint fingerprint, Guid? collectionId = null, CancellationToken ct = default)
     {
         var db = _connectionManager.GetDatabase();
         var sortedSetKey = SortedSetKey(userId);
@@ -64,10 +64,16 @@ return 1
         var addSortedSetTask = batch.SortedSetAddAsync(sortedSetKey, photoIdStr, fingerprint.Total.L);
         var setHashTask = batch.HashSetAsync(hashKey, FingerprintToHashEntries(fingerprint));
 
+        // Also add to collection-specific sorted set if collection specified
+        Task? addCollectionTask = null;
+        if (collectionId.HasValue)
+            addCollectionTask = batch.SortedSetAddAsync(CollectionSortedSetKey(userId, collectionId.Value), photoIdStr, fingerprint.Total.L);
+
         batch.Execute();
 
         await addSortedSetTask;
         await setHashTask;
+        if (addCollectionTask is not null) await addCollectionTask;
     }
 
     public async Task RemovePhotoAsync(Guid userId, Guid photoId, CancellationToken ct = default)
@@ -91,10 +97,13 @@ return 1
     public async Task<ColorMatchResult?> FindBestMatchAsync(
         Guid userId, ColorFingerprint target, Guid jobId,
         int maxUsagePerPhoto = 5, int tileRow = -1, int tileCol = -1, int minDistance = 3,
-        CancellationToken ct = default)
+        Guid? collectionId = null, CancellationToken ct = default)
     {
         var db = _connectionManager.GetDatabase();
-        var sortedSetKey = SortedSetKey(userId);
+        // Use collection-specific index if collectionId is provided, otherwise user-wide
+        var sortedSetKey = collectionId.HasValue
+            ? CollectionSortedSetKey(userId, collectionId.Value)
+            : SortedSetKey(userId);
         var usageKey = UsageKey(jobId);
         var targetL = target.Total.L;
 
@@ -228,11 +237,12 @@ return 1
         // Add new photos
         foreach (var (photoId, fingerprint) in photos)
         {
-            await AddPhotoAsync(userId, photoId, fingerprint, ct);
+            await AddPhotoAsync(userId, photoId, fingerprint, null, ct);
         }
     }
 
     private static string SortedSetKey(Guid userId) => $"user:{userId}:colors";
+    private static string CollectionSortedSetKey(Guid userId, Guid collectionId) => $"user:{userId}:collection:{collectionId}:colors";
     private static string PhotoHashKey(Guid userId, Guid photoId) => $"user:{userId}:photo:{photoId}";
     private static string PhotoHashKey(Guid userId, string photoIdStr) => $"user:{userId}:photo:{photoIdStr}";
     private static string UsageKey(Guid jobId) => $"job:{jobId}:usage";

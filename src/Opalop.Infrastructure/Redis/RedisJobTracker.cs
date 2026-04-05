@@ -12,12 +12,12 @@ public class RedisJobTracker : IJobTracker
         _connectionManager = connectionManager;
     }
 
-    public async Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, byte opacity, CancellationToken ct = default)
+    public async Task InitJobAsync(Guid jobId, int totalTiles, Guid userId, int pxFormat, byte opacity, int style, Guid? collectionId = null, CancellationToken ct = default)
     {
         var db = _connectionManager.GetDatabase();
         var key = JobKey(jobId);
 
-        var entries = new HashEntry[]
+        var entries = new List<HashEntry>
         {
             new("job_id", jobId.ToString()),
             new("total_tiles", totalTiles),
@@ -25,10 +25,13 @@ public class RedisJobTracker : IJobTracker
             new("user_id", userId.ToString()),
             new("px_format", pxFormat),
             new("opacity", (int)opacity),
+            new("style", style),
             new("status", "processing"),
         };
+        if (collectionId.HasValue)
+            entries.Add(new("collection_id", collectionId.Value.ToString()));
 
-        await db.HashSetAsync(key, entries);
+        await db.HashSetAsync(key, entries.ToArray());
         await db.KeyExpireAsync(key, TimeSpan.FromHours(1));
     }
 
@@ -60,6 +63,8 @@ public class RedisJobTracker : IJobTracker
             UserId: Guid.Parse(dict["user_id"]),
             PxFormat: int.Parse(dict["px_format"]),
             Opacity: dict.TryGetValue("opacity", out var opStr) ? byte.Parse(opStr) : (byte)128,
+            Style: dict.TryGetValue("style", out var stStr) ? int.Parse(stStr) : 0,
+            CollectionId: dict.TryGetValue("collection_id", out var colStr) ? Guid.Parse(colStr) : null,
             Status: dict["status"]);
     }
 

@@ -123,7 +123,7 @@ public class GooglePhotosImporter(
         await db.SaveChangesAsync(ct);
 
         // Index in Redis
-        await colorIndex.AddPhotoAsync(userId, photoId, fingerprint, ct);
+        await colorIndex.AddPhotoAsync(userId, photoId, fingerprint, ct: ct);
 
         resized.Dispose();
         cropped.Dispose();

@@ -102,7 +102,7 @@ public sealed class TileProcessorService(
         var match = await colorIndex.FindBestMatchAsync(
             jobInfo.UserId, tile.Fingerprint, tile.JobId,
             maxUsagePerPhoto: 5, tileRow: tileRow, tileCol: tileCol,
-            minDistance: 3, ct: ct);
+            minDistance: 3, collectionId: jobInfo.CollectionId, ct: ct);
 
         if (match is not null)
         {
@@ -261,21 +261,25 @@ public sealed class TileProcessorService(
                 processedTiles.Add(new ProcessedTile(col * pxFormat, row * pxFormat, tileBitmap));
             }
 
-            // Download original source image to use as canvas base (tiles drawn on top with transparency)
+            var isClassic = jobInfo.Style == (int)Domain.Enums.MosaicStyle.Classic;
             SKBitmap? sourceBitmap = null;
-            try
+
+            if (!isClassic)
             {
-                await using var sourceStream = await photoStorage.DownloadAsync("resources", resourceStoragePath, ct);
-                sourceBitmap = SKBitmap.Decode(sourceStream);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to download source image for transparency overlay, falling back to blank canvas");
+                try
+                {
+                    await using var sourceStream = await photoStorage.DownloadAsync("resources", resourceStoragePath, ct);
+                    sourceBitmap = SKBitmap.Decode(sourceStream);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to download source image for overlay, falling back to classic mode");
+                }
             }
 
-            using var mosaicBitmap = sourceBitmap is not null
-                ? MosaicAssembler.Assemble(processedTiles, sourceBitmap, gridDims.Width, gridDims.Height, jobInfo.Opacity)
-                : MosaicAssembler.Assemble(processedTiles, gridDims.Width, gridDims.Height);
+            using var mosaicBitmap = (isClassic || sourceBitmap is null)
+                ? MosaicAssembler.AssembleClassic(processedTiles, gridDims.Width, gridDims.Height)
+                : MosaicAssembler.Assemble(processedTiles, sourceBitmap, gridDims.Width, gridDims.Height, jobInfo.Opacity);
             sourceBitmap?.Dispose();
 
             using var mosaicImage = SKImage.FromBitmap(mosaicBitmap);

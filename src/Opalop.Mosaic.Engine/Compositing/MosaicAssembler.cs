@@ -10,6 +10,23 @@ public record ProcessedTile(int X, int Y, SKBitmap Bitmap) : IDisposable
 public static class MosaicAssembler
 {
     /// <summary>
+    /// Classic photomosaic: tiles drawn fully opaque on a black canvas.
+    /// The original image emerges purely from color matching — no transparency.
+    /// </summary>
+    public static SKBitmap AssembleClassic(IReadOnlyList<ProcessedTile> tiles,
+        int canvasWidth, int canvasHeight)
+    {
+        var result = new SKBitmap(canvasWidth, canvasHeight);
+        using var canvas = new SKCanvas(result);
+        canvas.Clear(SKColors.Black);
+
+        foreach (var tile in tiles)
+            canvas.DrawBitmap(tile.Bitmap, tile.X, tile.Y);
+
+        return result;
+    }
+
+    /// <summary>
     /// Assembles the mosaic using legacy premultiplied-alpha compositing:
     /// 1. Source image is resized to match the upscaled tile grid
     /// 2. Each tile gets legacy transparency (both RGB + Alpha scaled by opacity%)

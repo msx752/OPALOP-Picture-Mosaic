@@ -9,6 +9,7 @@ public class OpalopDbContext(DbContextOptions<OpalopDbContext> options) : DbCont
     public DbSet<Photo> Photos => Set<Photo>();
     public DbSet<Resource> Resources => Set<Resource>();
     public DbSet<MosaicJob> MosaicJobs => Set<MosaicJob>();
+    public DbSet<PhotoCollection> PhotoCollections => Set<PhotoCollection>();
     public DbSet<SocialConnection> SocialConnections => Set<SocialConnection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

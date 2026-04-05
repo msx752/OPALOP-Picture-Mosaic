@@ -15,8 +15,10 @@ public class Photo
     public float TotalA { get; set; }
     public float TotalB { get; set; }
     public List<QuadrantLab> Quadrants { get; init; } = [];
+    public Guid? CollectionId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime UploadedAt { get; init; } = DateTime.UtcNow;
 
     public User User { get; init; } = null!;
+    public PhotoCollection? Collection { get; set; }
 }
