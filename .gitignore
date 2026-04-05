@@ -236,3 +236,4 @@ _Pvt_Extensions
 .fake/
 MainAPIServer/QPS_Web1/UserFolders/
 ClusterServer/QPS_Method1/UserFolders/
+test-outputs/
