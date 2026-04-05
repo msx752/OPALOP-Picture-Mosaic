@@ -138,17 +138,17 @@ else if (_step == 2)
             .ToListAsync();
     }
 
-    private async Task HandleResourceUpload(InputFileChangeEventArgs e)
+    private Task HandleResourceUpload(InputFileChangeEventArgs e)
     {
         _uploadError = null;
         var file = e.File;
         if (file.Size > 12 * 1024 * 1024)
         {
             _uploadError = "File exceeds 12MB limit.";
-            return;
+            return Task.CompletedTask;
         }
-        // Resource upload requires API call — for now show message
         _uploadError = "Use the API endpoint POST /api/resources/upload for now. Resource upload via UI coming soon.";
+        return Task.CompletedTask;
     }
 
     private async Task Generate()
